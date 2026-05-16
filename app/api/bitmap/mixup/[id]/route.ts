@@ -3,6 +3,10 @@ import sharp from "sharp";
 import { db } from "@/lib/database/db";
 import { withExplicitUserScope } from "@/lib/database/scoped-db";
 import { checkDbConnection } from "@/lib/database/utils";
+import {
+	type BitmapRenderOptions,
+	parseBitmapQueryParams,
+} from "@/lib/display/color-palette";
 import { getLayoutById, type LayoutSlot } from "@/lib/mixup/constants";
 import {
 	DEFAULT_IMAGE_HEIGHT,
@@ -24,7 +28,7 @@ export async function GET(
 		const { searchParams } = new URL(req.url);
 		const widthParam = searchParams.get("width");
 		const heightParam = searchParams.get("height");
-		const grayscaleParam = searchParams.get("grayscale");
+		const bitmapRender = parseBitmapQueryParams(searchParams);
 		const accessToken =
 			searchParams.get("access_token") ?? req.headers.get("Access-Token");
 
@@ -32,8 +36,6 @@ export async function GET(
 		const height = heightParam
 			? parseInt(heightParam, 10)
 			: DEFAULT_IMAGE_HEIGHT;
-		const grayscaleLevels = grayscaleParam ? parseInt(grayscaleParam, 10) : 2;
-
 		const { ready } = await checkDbConnection();
 		if (!ready) {
 			logger.error("Database not available for mixup rendering");
@@ -109,7 +111,7 @@ export async function GET(
 			assignments,
 			width,
 			height,
-			grayscaleLevels,
+			bitmapRender,
 			device.user_id,
 		);
 
@@ -159,7 +161,7 @@ async function renderMixupComposite(
 	assignments: Record<string, string | null>,
 	width: number,
 	height: number,
-	grayscaleLevels: number,
+	renderOptions: BitmapRenderOptions,
 	userId: string,
 ): Promise<Buffer> {
 	// Render all slots in parallel
@@ -215,7 +217,10 @@ async function renderMixupComposite(
 		ditheringMethod: DitheringMethod.ATKINSON,
 		width,
 		height,
-		grayscale: grayscaleLevels,
+		applyEdgeSnap: !renderOptions.palette,
+		...(renderOptions.palette
+			? { palette: renderOptions.palette }
+			: { grayscale: renderOptions.grayscale ?? 2 }),
 	});
 
 	return bmpBuffer;

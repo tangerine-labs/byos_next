@@ -12,11 +12,21 @@ const PUBLIC_PATHS = [
 	"/recover",
 ];
 
+/** Headless Chrome recipe capture (REACT_RENDERER=browser) — must not redirect to sign-in. */
+const RECIPE_PREVIEW_PATH = /^\/recipes\/[^/]+\/preview\/?$/;
+
+function isPublicPath(pathname: string): boolean {
+	return (
+		PUBLIC_PATHS.some((path) => pathname.startsWith(path)) ||
+		RECIPE_PREVIEW_PATH.test(pathname)
+	);
+}
+
 export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	// Skip auth for public paths
-	if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
+	if (isPublicPath(pathname)) {
 		return NextResponse.next();
 	}
 

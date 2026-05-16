@@ -9,6 +9,10 @@ import { StatusIndicator } from "@/components/common/status-indicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+	buildBitmapQueryParams,
+	getDisplayColorLabel,
+} from "@/lib/display/color-palette";
 import { DeviceDisplayMode } from "@/lib/mixup/constants";
 import {
 	DEFAULT_IMAGE_HEIGHT,
@@ -61,11 +65,6 @@ const calculateRefreshPerDay = (
 		}
 	}
 	return Math.max(0, refreshesPerDay);
-};
-
-const getGrayscaleLevels = (grayscale: number | null | undefined): number => {
-	if (grayscale === 2 || grayscale === 4 || grayscale === 16) return grayscale;
-	return 2;
 };
 
 interface DeviceViewProps {
@@ -146,7 +145,12 @@ export default function DeviceView({
 	const deviceHeight = isPortrait
 		? device.screen_width || DEFAULT_IMAGE_WIDTH
 		: device.screen_height || DEFAULT_IMAGE_HEIGHT;
-	const grayscaleLevels = getGrayscaleLevels(device.grayscale);
+	const bitmapQuery = buildBitmapQueryParams({
+		width: deviceWidth,
+		height: deviceHeight,
+		grayscale: device.grayscale,
+		paletteId: device.palette_id,
+	});
 
 	const status: "online" | "offline" =
 		device.status === "online" ? "online" : "offline";
@@ -162,10 +166,10 @@ export default function DeviceView({
 	const isMixup =
 		device.display_mode === DeviceDisplayMode.MIXUP && device.mixup_id;
 	const heroSrc = isPlaylist
-		? `/api/bitmap/${playlistScreens[0].screen || "simple-text"}.bmp?width=${deviceWidth}&height=${deviceHeight}`
+		? `/api/bitmap/${playlistScreens[0].screen || "simple-text"}.bmp?${bitmapQuery}`
 		: isMixup
-			? `/api/bitmap/mixup/${device.mixup_id}.bmp?width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}`
-			: `/api/bitmap/${device?.screen || "simple-text"}.bmp?width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}`;
+			? `/api/bitmap/mixup/${device.mixup_id}.bmp?${bitmapQuery}`
+			: `/api/bitmap/${device?.screen || "simple-text"}.bmp?${bitmapQuery}`;
 
 	return (
 		<div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
@@ -179,7 +183,7 @@ export default function DeviceView({
 							<span className="capitalize">
 								{isPortrait ? "portrait" : "landscape"}
 							</span>{" "}
-							· {grayscaleLevels} levels
+							· {getDisplayColorLabel(device.grayscale, device.palette_id)}
 						</span>
 					}
 				/>

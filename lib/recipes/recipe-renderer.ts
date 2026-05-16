@@ -251,8 +251,10 @@ type RenderOptions = {
 	imageHeight: number;
 	formats?: RenderFormats;
 	grayscale?: number; // Number of gray levels: 2, 4, or 16
+	palette?: string[]; // Hex colors for discrete-color screens
 	html?: string; // When set, uses Puppeteer screenshot instead of Takumi/Satori
 	cookies?: string; // Cookie header to forward to browser renderer
+	userId?: string | null; // Device owner for browser preview when no session cookies
 };
 
 type RenderResults = {
@@ -275,8 +277,10 @@ export const renderRecipeOutputs = cache(
 		imageHeight,
 		formats = ["bitmap", "png"],
 		grayscale,
+		palette,
 		html,
 		cookies,
+		userId,
 	}: RenderOptions): Promise<RenderResults> => {
 		const results = getDefaultRenderResults();
 		const needsPng = formats.includes("png");
@@ -306,6 +310,7 @@ export const renderRecipeOutputs = cache(
 						imageHeight,
 						scaleFactor,
 						cookies,
+						userId,
 					);
 				} else {
 					const element = createElement(Component, props);
@@ -347,8 +352,11 @@ export const renderRecipeOutputs = cache(
 					ditheringMethod: DitheringMethod.FLOYD_STEINBERG,
 					width: imageWidth,
 					height: imageHeight,
-					applyEdgeSnap: config?.renderSettings?.applyEdgeSnap ?? true,
-					...(grayscale !== undefined && { grayscale }),
+					applyEdgeSnap: palette
+						? false
+						: (config?.renderSettings?.applyEdgeSnap ?? true),
+					...(palette ? { palette } : {}),
+					...(grayscale !== undefined && !palette && { grayscale }),
 				});
 			} catch (error) {
 				logger.error(`Error generating bitmap for ${slug}:`, error);
@@ -475,6 +483,7 @@ export async function renderRecipeToImage({
 	imageHeight,
 	formats = ["bitmap", "png"],
 	grayscale,
+	palette,
 	userId,
 	cookies,
 }: {
@@ -483,6 +492,7 @@ export async function renderRecipeToImage({
 	imageHeight: number;
 	formats?: RenderFormats;
 	grayscale?: number;
+	palette?: string[];
 	userId?: string | null;
 	cookies?: string;
 }): Promise<RenderResults> {
@@ -497,7 +507,9 @@ export async function renderRecipeToImage({
 			imageHeight,
 			formats,
 			grayscale,
+			palette,
 			cookies,
+			userId,
 		});
 	}
 
@@ -517,6 +529,8 @@ export async function renderRecipeToImage({
 		imageHeight,
 		formats,
 		grayscale,
+		palette,
 		cookies,
+		userId,
 	});
 }

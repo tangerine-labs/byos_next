@@ -11,14 +11,18 @@ export default async function RecipePreviewPage({
 	searchParams,
 }: {
 	params: Promise<{ slug: string }>;
-	searchParams: Promise<{ width?: string; height?: string }>;
+	searchParams: Promise<{
+		width?: string;
+		height?: string;
+		userId?: string;
+	}>;
 }) {
 	// Access headers to mark route as dynamic and allow time-based operations
 	headers();
 	const { slug } = await params;
-	const { width: widthParam, height: heightParam } = await searchParams;
+	const { width: widthParam, height: heightParam, userId } = await searchParams;
 
-	const config = await fetchRecipeConfig(slug);
+	const config = await fetchRecipeConfig(slug, userId);
 
 	if (!config) {
 		notFound();
@@ -31,7 +35,7 @@ export default async function RecipePreviewPage({
 	}
 
 	const Component = component;
-	const props = await fetchRecipeProps(slug, config);
+	const props = await fetchRecipeProps(slug, config, undefined, userId);
 
 	// Apply width/height from query params if provided (for browser rendering)
 	const width = widthParam ? Number.parseInt(widthParam, 10) : undefined;

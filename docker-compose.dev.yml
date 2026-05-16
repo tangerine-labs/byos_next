@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
+      - CI=true
       - NODE_ENV=development
       - CHROME_EXECUTABLE_PATH=/headless-shell/headless-shell
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true

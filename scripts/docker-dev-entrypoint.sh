@@ -7,5 +7,11 @@ fi
 
 cd /app
 
+export CI=true
+
+# Bind-mounted package.json may differ from the image; sync pnpm via packageManager.
+corepack enable
+corepack prepare --activate
+
 pnpm generate:sql
 exec pnpm exec next dev --turbopack -H 0.0.0.0

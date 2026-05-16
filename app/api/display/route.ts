@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database/db";
 import { checkDbConnection } from "@/lib/database/utils";
+import { buildBitmapQueryParams } from "@/lib/display/color-palette";
 import { getLatestFirmware, isUpdateAvailable } from "@/lib/firmware";
 import { logError, logInfo } from "@/lib/logger";
 import { DeviceDisplayMode } from "@/lib/mixup/constants";
@@ -22,17 +23,6 @@ import {
 
 export const DEFAULT_SCREEN = "album";
 export const DEFAULT_REFRESH_RATE = 180;
-
-/**
- * Map grayscale value from database to number of gray levels
- * Valid values: 2, 4, or 16. Defaults to 2 if invalid.
- */
-function getGrayscaleLevels(grayscale: number | null | undefined): number {
-	if (grayscale === 2 || grayscale === 4 || grayscale === 16) {
-		return grayscale;
-	}
-	return 2; // Default to 2 levels (black/white)
-}
 
 export async function GET(request: Request) {
 	const headers = parseRequestHeaders(request);
@@ -107,10 +97,15 @@ export async function GET(request: Request) {
 
 		const deviceWidth = headers.width || storedWidth;
 		const deviceHeight = headers.height || storedHeight;
-		const grayscaleLevels = getGrayscaleLevels(device.grayscale);
+		const bitmapQuery = buildBitmapQueryParams({
+			width: deviceWidth,
+			height: deviceHeight,
+			grayscale: device.grayscale,
+			paletteId: device.palette_id,
+		});
 
 		// Build common query params for image URLs
-		const baseQueryParams = `width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}${headers.base64 ? "&base64=true" : ""}`;
+		const baseQueryParams = `${bitmapQuery}${headers.base64 ? "&base64=true" : ""}`;
 
 		let dynamicRefreshRate = 180;
 		let imageUrl: string;

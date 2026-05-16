@@ -9,17 +9,20 @@ LABEL org.opencontainers.image.vendor="rbouteiller"
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV CI=true
 
 WORKDIR /app
 
-RUN corepack enable pnpm
+RUN corepack enable
 
 # Install dependencies only when needed
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
-RUN pnpm install --frozen-lockfile --prod=false \
+RUN corepack prepare --activate \
+    && pnpm install --frozen-lockfile --prod=false \
     && rm -rf ~/.npm ~/.pnpm-store /root/.cache
 
 # Build the application
@@ -28,7 +31,8 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm run build \
+RUN corepack prepare --activate \
+    && pnpm run build \
     && rm -rf node_modules/.cache
 
 # Production image - chromedp/headless-shell for minimal Chrome footprint

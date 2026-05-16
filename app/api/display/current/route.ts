@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database/db";
 import { checkDbConnection } from "@/lib/database/utils";
+import { buildBitmapQueryParams } from "@/lib/display/color-palette";
 import { logError, logInfo } from "@/lib/logger";
 import {
 	DEFAULT_IMAGE_HEIGHT,
@@ -75,15 +76,14 @@ export async function GET(request: Request) {
 				? deviceData.screen_height || DEFAULT_IMAGE_HEIGHT
 				: deviceData.screen_width || DEFAULT_IMAGE_WIDTH;
 
-		// Get grayscale levels (default to 2 if not set)
-		const grayscaleLevels =
-			deviceData.grayscale === 2 ||
-			deviceData.grayscale === 4 ||
-			deviceData.grayscale === 16
-				? deviceData.grayscale
-				: 2;
+		const bitmapQuery = buildBitmapQueryParams({
+			width: deviceWidth,
+			height: deviceHeight,
+			grayscale: deviceData.grayscale,
+			paletteId: deviceData.palette_id,
+		});
 
-		const imageUrl = `${baseUrl}/${screenToDisplay}.bmp?width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}`;
+		const imageUrl = `${baseUrl}/${screenToDisplay}.bmp?${bitmapQuery}`;
 
 		// Calculate refresh rate from schedule or use default
 		const refreshSchedule = deviceData.refresh_schedule as {

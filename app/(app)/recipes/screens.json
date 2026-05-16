@@ -171,6 +171,28 @@
 		"version": "0.1.0",
 		"category": "display-components"
 	},
+	"color-calendar": {
+		"title": "Color Calendar",
+		"published": true,
+		"createdAt": "2026-05-16T00:00:00Z",
+		"updatedAt": "2026-05-16T00:00:00Z",
+		"description": "Current month calendar with Danish public holidays highlighted in red. Optimized for 1600×1200 color e-ink.",
+		"componentPath": "./screens/color-calendar",
+		"hasDataFetch": false,
+		"props": {},
+		"params": {},
+		"tags": ["calendar", "color", "denmark"],
+		"author": {
+			"name": "BYOS",
+			"github": ""
+		},
+		"renderSettings": {
+			"doubleSizeForSharperText": true,
+			"applyEdgeSnap": false
+		},
+		"version": "0.1.0",
+		"category": "calendar"
+	},
 	"not-found": {
 		"title": "Not Found Recipe",
 		"published": true,

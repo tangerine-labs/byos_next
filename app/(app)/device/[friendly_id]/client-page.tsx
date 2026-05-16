@@ -178,11 +178,16 @@ export default function DeviceClientPage({
 				},
 			});
 		} else {
-			// Convert grayscale to number
+			// Convert grayscale to number; empty palette_id clears color mode
 			if (name === "grayscale") {
 				setEditedDevice({
 					...editedDevice,
 					[name]: Number.parseInt(value, 10),
+				});
+			} else if (name === "palette_id") {
+				setEditedDevice({
+					...editedDevice,
+					palette_id: value || null,
 				});
 			} else {
 				setEditedDevice({
@@ -248,22 +253,35 @@ export default function DeviceClientPage({
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
-		// Validate API key
-		if (!isValidApiKey(editedDevice.api_key)) {
+		const apiKey = editedDevice.api_key?.trim() ?? "";
+		const friendlyId = editedDevice.friendly_id?.trim().toUpperCase() ?? "";
+		const apiKeyChanged = apiKey !== (device.api_key?.trim() ?? "");
+
+		// Only validate API key when the user changed it (existing keys may predate stricter rules)
+		if (apiKeyChanged && !isValidApiKey(apiKey)) {
 			setApiKeyError(
 				"API Key must be alphanumeric and between 20 to 60 characters long.",
 			);
+			toast.error("Cannot save device", {
+				description:
+					"Fix the API key on the Essentials tab (20–60 alphanumeric characters).",
+			});
 			return;
 		}
 
-		// Validate Friendly ID
-		if (!isValidFriendlyId(editedDevice.friendly_id)) {
+		if (!isValidFriendlyId(friendlyId)) {
 			setFriendlyIdError(
 				"Friendly ID must be exactly 6 uppercase alphanumeric characters.",
 			);
+			toast.error("Cannot save device", {
+				description:
+					"Fix the Friendly ID on the Essentials tab (6 uppercase letters or numbers).",
+			});
 			return;
 		}
 
+		setApiKeyError(null);
+		setFriendlyIdError(null);
 		setIsSaving(true);
 
 		try {
@@ -272,8 +290,8 @@ export default function DeviceClientPage({
 				id: editedDevice.id,
 				name: editedDevice.name,
 				mac_address: editedDevice.mac_address,
-				api_key: editedDevice.api_key,
-				friendly_id: editedDevice.friendly_id,
+				api_key: apiKey,
+				friendly_id: friendlyId,
 				timezone: editedDevice.timezone,
 				refresh_schedule: editedDevice.refresh_schedule,
 				screen: editedDevice.screen,
@@ -284,16 +302,14 @@ export default function DeviceClientPage({
 				screen_height: editedDevice.screen_height,
 				screen_orientation: editedDevice.screen_orientation,
 				grayscale: editedDevice.grayscale,
+				palette_id: editedDevice.palette_id,
 			});
 
 			if (result.success) {
 				// Fetch the updated device to ensure we have the latest data
-				const updatedDevice = await fetchDeviceByFriendlyId(
-					editedDevice.friendly_id,
-				);
+				const updatedDevice = await fetchDeviceByFriendlyId(friendlyId);
 
 				if (updatedDevice) {
-					// Update the device state with the latest data
 					const enhancedDevice = {
 						...updatedDevice,
 						status: getDeviceStatus(updatedDevice),
@@ -301,9 +317,15 @@ export default function DeviceClientPage({
 
 					setDevice(enhancedDevice);
 					setEditedDevice(JSON.parse(JSON.stringify(enhancedDevice)));
+					setIsEditing(false);
 
 					toast("Device updated", {
 						description: "The device has been successfully updated.",
+					});
+				} else {
+					toast.error("Update failed", {
+						description:
+							"Changes were saved but the device could not be reloaded. Refresh the page.",
 					});
 				}
 			} else {
@@ -319,7 +341,6 @@ export default function DeviceClientPage({
 			});
 		} finally {
 			setIsSaving(false);
-			setIsEditing(false);
 		}
 	};
 
@@ -423,7 +444,12 @@ export default function DeviceClientPage({
 								<X className="mr-1.5 h-3.5 w-3.5" />
 								Cancel
 							</Button>
-							<Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+							<Button
+								type="submit"
+								form="device-edit-form"
+								size="sm"
+								disabled={isSaving}
+							>
 								{isSaving ? (
 									<>
 										<RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />

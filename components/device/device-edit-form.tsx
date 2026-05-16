@@ -30,6 +30,13 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+	buildBitmapQueryParams,
+	COLOR_6A_HEX,
+	COLOR_6A_PALETTE_ID,
+	getDisplayColorLabel,
+	isColor6Palette,
+} from "@/lib/display/color-palette";
 import { DeviceDisplayMode } from "@/lib/mixup/constants";
 import {
 	DEFAULT_IMAGE_HEIGHT,
@@ -78,6 +85,8 @@ const getGrayscaleLevels = (grayscale: number | null | undefined): number => {
 	return 2;
 };
 
+type DisplayColorMode = "grayscale" | "color-6";
+
 function PanelHeader({
 	label,
 	right,
@@ -124,6 +133,14 @@ export default function DeviceEditForm({
 		? editedDevice.screen_width || DEFAULT_IMAGE_WIDTH
 		: editedDevice.screen_height || DEFAULT_IMAGE_HEIGHT;
 	const grayscaleLevels = getGrayscaleLevels(editedDevice.grayscale);
+	const isColor6 = isColor6Palette(editedDevice.palette_id);
+	const displayColorMode: DisplayColorMode = isColor6 ? "color-6" : "grayscale";
+	const bitmapQuery = buildBitmapQueryParams({
+		width: deviceWidth,
+		height: deviceHeight,
+		grayscale: editedDevice.grayscale,
+		paletteId: editedDevice.palette_id,
+	});
 
 	const isMixup =
 		editedDevice.display_mode === DeviceDisplayMode.MIXUP &&
@@ -133,11 +150,11 @@ export default function DeviceEditForm({
 		!!editedDevice.playlist_id;
 
 	const heroSrc = isMixup
-		? `/api/bitmap/mixup/${editedDevice.mixup_id}.bmp?width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}`
-		: `/api/bitmap/${editedDevice?.screen || "simple-text"}.bmp?width=${deviceWidth}&height=${deviceHeight}&grayscale=${grayscaleLevels}`;
+		? `/api/bitmap/mixup/${editedDevice.mixup_id}.bmp?${bitmapQuery}`
+		: `/api/bitmap/${editedDevice?.screen || "simple-text"}.bmp?${bitmapQuery}`;
 
 	return (
-		<form onSubmit={onSubmit}>
+		<form id="device-edit-form" onSubmit={onSubmit}>
 			<div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
 				{/* Hero preview — left column, sticky on lg */}
 				<section className="flex flex-col overflow-hidden rounded-2xl border bg-card lg:sticky lg:top-4 lg:self-start">
@@ -149,7 +166,11 @@ export default function DeviceEditForm({
 								<span className="capitalize">
 									{isPortrait ? "portrait" : "landscape"}
 								</span>{" "}
-								· {grayscaleLevels} levels
+								·{" "}
+								{getDisplayColorLabel(
+									editedDevice.grayscale,
+									editedDevice.palette_id,
+								)}
 							</span>
 						}
 					/>
@@ -516,23 +537,67 @@ export default function DeviceEditForm({
 							</Field>
 
 							<Field
-								label="Grayscale levels"
-								hint="Number of gray levels for image rendering."
+								label="Display colors"
+								hint="Grayscale e-ink uses gray levels; 6-color screens use red, green, blue, yellow, black, and white only."
 							>
-								<ToggleGroup
-									type="single"
-									value={String(grayscaleLevels)}
+								<Select
+									value={displayColorMode}
 									onValueChange={(value) => {
-										if (value) onSelectChange("grayscale", value);
+										if (value === "color-6") {
+											onSelectChange("palette_id", COLOR_6A_PALETTE_ID);
+										} else {
+											onSelectChange("palette_id", "");
+										}
 									}}
-									variant="outline"
-									className="grid w-fit grid-cols-3"
 								>
-									<ToggleGroupItem value="2">2</ToggleGroupItem>
-									<ToggleGroupItem value="4">4</ToggleGroupItem>
-									<ToggleGroupItem value="16">16</ToggleGroupItem>
-								</ToggleGroup>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="grayscale">Grayscale</SelectItem>
+										<SelectItem value="color-6">
+											6-color (RGBY + B/W)
+										</SelectItem>
+									</SelectContent>
+								</Select>
 							</Field>
+
+							{displayColorMode === "grayscale" ? (
+								<Field
+									label="Grayscale levels"
+									hint="Number of gray levels for image rendering."
+								>
+									<ToggleGroup
+										type="single"
+										value={String(grayscaleLevels)}
+										onValueChange={(value) => {
+											if (value) onSelectChange("grayscale", value);
+										}}
+										variant="outline"
+										className="grid w-fit grid-cols-3"
+									>
+										<ToggleGroupItem value="2">2</ToggleGroupItem>
+										<ToggleGroupItem value="4">4</ToggleGroupItem>
+										<ToggleGroupItem value="16">16</ToggleGroupItem>
+									</ToggleGroup>
+								</Field>
+							) : (
+								<Field
+									label="Palette"
+									hint="Images are dithered to these six colors only — no intermediate grays."
+								>
+									<div className="flex flex-wrap gap-2">
+										{COLOR_6A_HEX.map((hex) => (
+											<span
+												key={hex}
+												className="size-8 rounded-md border shadow-sm"
+												style={{ backgroundColor: hex }}
+												title={hex}
+											/>
+										))}
+									</div>
+								</Field>
+							)}
 						</TabsContent>
 
 						<TabsContent value="refresh" className="mt-4 space-y-4">

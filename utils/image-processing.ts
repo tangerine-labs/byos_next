@@ -1,3 +1,43 @@
+import type { Rgb } from "@/lib/display/color-palette";
+import { parseHexColor } from "@/lib/display/color-palette";
+
+export type ColorPalette = Rgb[];
+
+const colorDistanceSq = (
+	r: number,
+	g: number,
+	b: number,
+	color: Rgb,
+): number => {
+	const dr = r - color.r;
+	const dg = g - color.g;
+	const db = b - color.b;
+	return dr * dr + dg * dg + db * db;
+};
+
+/** Index of the nearest palette color (squared RGB distance). */
+export const findNearestPaletteIndex = (
+	r: number,
+	g: number,
+	b: number,
+	palette: ColorPalette,
+): number => {
+	let bestIndex = 0;
+	let bestDist = Number.POSITIVE_INFINITY;
+	for (let i = 0; i < palette.length; i++) {
+		const dist = colorDistanceSq(r, g, b, palette[i]);
+		if (dist < bestDist) {
+			bestDist = dist;
+			bestIndex = i;
+		}
+	}
+	return bestIndex;
+};
+
+export function parseHexPalette(hexColors: string[]): ColorPalette {
+	return hexColors.map(parseHexColor);
+}
+
 /** Quantize a single pixel value to the nearest available gray level
  *  e.g. levels=2 → 0 or 255, levels=4 → 0, 85, 170, 256
  **/
@@ -90,6 +130,64 @@ export const ditherAtkinson = (
 			if (y + 1 < height) buffer[index + width] += error;
 			if (y + 1 < height && x + 1 < width) buffer[index + width + 1] += error;
 			if (y + 2 < height) buffer[index + width * 2] += error;
+		}
+	}
+
+	return result;
+};
+
+/** Floyd–Steinberg dithering into a fixed RGB palette (returns palette indices). */
+export const ditherFloydSteinbergColor = (
+	rgb: Uint8Array,
+	width: number,
+	height: number,
+	palette: ColorPalette,
+): Uint8Array => {
+	const result = new Uint8Array(width * height);
+	const rBuf = new Float32Array(width * height);
+	const gBuf = new Float32Array(width * height);
+	const bBuf = new Float32Array(width * height);
+
+	for (let i = 0; i < width * height; i++) {
+		const o = i * 3;
+		rBuf[i] = rgb[o];
+		gBuf[i] = rgb[o + 1];
+		bBuf[i] = rgb[o + 2];
+	}
+
+	const diffuse = (
+		index: number,
+		dr: number,
+		dg: number,
+		db: number,
+		factor: number,
+	) => {
+		if (index < 0 || index >= width * height) return;
+		rBuf[index] += (dr * factor) / 16;
+		gBuf[index] += (dg * factor) / 16;
+		bBuf[index] += (db * factor) / 16;
+	};
+
+	for (let y = 0; y < height; y++) {
+		for (let x = 0; x < width; x++) {
+			const index = y * width + x;
+			const oldR = rBuf[index];
+			const oldG = gBuf[index];
+			const oldB = bBuf[index];
+			const paletteIndex = findNearestPaletteIndex(oldR, oldG, oldB, palette);
+			const chosen = palette[paletteIndex];
+			result[index] = paletteIndex;
+
+			const errR = oldR - chosen.r;
+			const errG = oldG - chosen.g;
+			const errB = oldB - chosen.b;
+
+			if (x + 1 < width) diffuse(index + 1, errR, errG, errB, 7);
+			if (y + 1 < height && x > 0)
+				diffuse(index + width - 1, errR, errG, errB, 3);
+			if (y + 1 < height) diffuse(index + width, errR, errG, errB, 5);
+			if (y + 1 < height && x + 1 < width)
+				diffuse(index + width + 1, errR, errG, errB, 1);
 		}
 	}
 
@@ -224,6 +322,12 @@ export interface DitheringOptions {
 	bayerPatternSize?: 2 | 4 | 8;
 }
 
+export interface ColorDitheringOptions {
+	width: number;
+	height: number;
+	palette: ColorPalette;
+}
+
 export function applyDithering(
 	method: DitheringMethod,
 	grayscale: Uint8Array,
@@ -311,4 +415,36 @@ export function applyDithering(
 	}
 
 	return result;
+}
+
+export function applyColorDithering(
+	method: DitheringMethod,
+	rgb: Uint8Array,
+	options: ColorDitheringOptions,
+): Uint8Array {
+	const { width, height, palette } = options;
+
+	if (palette.length < 2) {
+		throw new Error("Color palette must have at least 2 colors");
+	}
+
+	switch (method) {
+		case DitheringMethod.FLOYD_STEINBERG:
+			return ditherFloydSteinbergColor(rgb, width, height, palette);
+		case DitheringMethod.NONE: {
+			const result = new Uint8Array(width * height);
+			for (let i = 0; i < width * height; i++) {
+				const o = i * 3;
+				result[i] = findNearestPaletteIndex(
+					rgb[o],
+					rgb[o + 1],
+					rgb[o + 2],
+					palette,
+				);
+			}
+			return result;
+		}
+		default:
+			return ditherFloydSteinbergColor(rgb, width, height, palette);
+	}
 }

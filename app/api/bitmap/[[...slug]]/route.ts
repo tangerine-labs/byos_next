@@ -2,6 +2,10 @@ import type { NextRequest } from "next/server";
 import { cache } from "react";
 import NotFoundScreen from "@/app/(app)/recipes/screens/not-found/not-found";
 import {
+	type BitmapRenderOptions,
+	parseBitmapQueryParams,
+} from "@/lib/display/color-palette";
+import {
 	DEFAULT_IMAGE_HEIGHT,
 	DEFAULT_IMAGE_WIDTH,
 	logger,
@@ -28,7 +32,7 @@ export async function GET(
 		const { searchParams } = new URL(req.url);
 		const widthParam = searchParams.get("width");
 		const heightParam = searchParams.get("height");
-		const grayscaleParam = searchParams.get("grayscale");
+		const bitmapRender = parseBitmapQueryParams(searchParams);
 
 		const width = widthParam ? parseInt(widthParam, 10) : DEFAULT_IMAGE_WIDTH;
 		const height = heightParam
@@ -38,10 +42,12 @@ export async function GET(
 		// Validate width and height are positive numbers
 		const validWidth = width > 0 ? width : DEFAULT_IMAGE_WIDTH;
 		const validHeight = height > 0 ? height : DEFAULT_IMAGE_HEIGHT;
-		const grayscaleLevels = grayscaleParam ? parseInt(grayscaleParam, 10) : 2;
 
+		const colorModeLabel = bitmapRender.palette
+			? `${bitmapRender.palette.length}-color palette`
+			: `${bitmapRender.grayscale ?? 2} gray levels`;
 		logger.info(
-			`Bitmap request for: ${bitmapPath} in ${validWidth}x${validHeight} with ${grayscaleLevels} gray levels`,
+			`Bitmap request for: ${bitmapPath} in ${validWidth}x${validHeight} with ${colorModeLabel}`,
 		);
 
 		// Resolve the device owner so DB queries are scoped to the right user
@@ -56,7 +62,7 @@ export async function GET(
 			recipeSlug,
 			validWidth,
 			validHeight,
-			grayscaleLevels,
+			bitmapRender,
 			userId,
 			cookieHeader || undefined,
 		);
@@ -92,7 +98,7 @@ const renderRecipeBitmap = cache(
 		recipeId: string,
 		width: number,
 		height: number,
-		grayscaleLevels: number = 2,
+		renderOptions: BitmapRenderOptions,
 		userId: string | null = null,
 		cookies?: string,
 	) => {
@@ -101,7 +107,7 @@ const renderRecipeBitmap = cache(
 			imageWidth: width,
 			imageHeight: height,
 			formats: ["bitmap"],
-			grayscale: grayscaleLevels,
+			...renderOptions,
 			userId,
 			cookies,
 		});

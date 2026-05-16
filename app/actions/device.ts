@@ -221,6 +221,8 @@ export async function updateDevice(
 	if (device.screen_orientation !== undefined)
 		updateData.screen_orientation = device.screen_orientation;
 	if (device.grayscale !== undefined) updateData.grayscale = device.grayscale;
+	if (device.palette_id !== undefined)
+		updateData.palette_id = device.palette_id;
 
 	updateData.updated_at = new Date().toISOString();
 

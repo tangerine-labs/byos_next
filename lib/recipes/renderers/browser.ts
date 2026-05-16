@@ -36,11 +36,19 @@ export async function renderWithBrowser(
 	height: number,
 	scale = 1,
 	cookies?: string,
+	userId?: string | null,
 ): Promise<Buffer> {
 	const port = process.env.PORT || 3000;
 	const baseUrl =
 		process.env.NEXT_PUBLIC_BASE_URL ?? `http://127.0.0.1:${port}`;
-	const url = `${baseUrl}/recipes/${slug}/preview?width=${width}&height=${height}`;
+	const params = new URLSearchParams({
+		width: String(width),
+		height: String(height),
+	});
+	if (userId) {
+		params.set("userId", userId);
+	}
+	const url = `${baseUrl}/recipes/${slug}/preview?${params}`;
 
 	const browser = await getBrowser("trusted");
 	const page = await browser.newPage();

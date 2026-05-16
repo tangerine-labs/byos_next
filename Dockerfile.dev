@@ -2,6 +2,11 @@ ARG NODE_VERSION=22
 
 FROM node:${NODE_VERSION}-slim AS node
 
+WORKDIR /app
+RUN corepack enable
+COPY package.json ./
+RUN corepack prepare --activate
+
 # Same headless Chrome as production so REACT_RENDERER=browser and Liquid HTML renders work.
 FROM chromedp/headless-shell:146.0.7655.3
 
@@ -9,20 +14,21 @@ WORKDIR /app
 
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV CI=true
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV CHROME_EXECUTABLE_PATH=/headless-shell/headless-shell
 
 COPY --from=node /usr/local /usr/local
-
-RUN corepack enable pnpm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies in the image; source is bind-mounted at runtime.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+RUN corepack prepare --activate \
+    && pnpm install --frozen-lockfile
 
 COPY scripts/docker-dev-entrypoint.sh ./scripts/docker-dev-entrypoint.sh
 RUN chmod +x scripts/docker-dev-entrypoint.sh
