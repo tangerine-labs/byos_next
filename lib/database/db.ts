@@ -2,21 +2,33 @@ import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import type { DB } from "./db.d";
 
-// Ensure DATABASE_URL is available
-if (!process.env.DATABASE_URL) {
-	console.warn("DATABASE_URL is not set. Database connection may fail.");
+function createPool() {
+	const connectionString = process.env.DATABASE_URL;
+	if (!connectionString) {
+		console.warn("DATABASE_URL is not set. Database connection may fail.");
+	}
+	return new Pool({
+		connectionString,
+		ssl: connectionString?.includes("sslmode=disable")
+			? false
+			: process.env.NODE_ENV === "production"
+				? { rejectUnauthorized: false }
+				: false,
+	});
+}
+
+let pool: Pool | undefined;
+
+function getPool() {
+	if (!pool) {
+		pool = createPool();
+	}
+	return pool;
 }
 
 // Create a new Kysely instance with Postgres dialect
 export const db = new Kysely<DB>({
 	dialect: new PostgresDialect({
-		pool: new Pool({
-			connectionString: process.env.DATABASE_URL,
-			ssl: process.env.DATABASE_URL?.includes("sslmode=disable")
-				? false
-				: process.env.NODE_ENV === "production"
-					? { rejectUnauthorized: false }
-					: false,
-		}),
+		pool: getPool(),
 	}),
 });

@@ -8,6 +8,7 @@
 		"generate:types": "kysely-codegen --dialect postgres --include-pattern='public.*' --out-file lib/database/db.d.ts",
 		"prebuild": "pnpm generate:sql",
 		"dev": "pnpm generate:sql && next dev --turbopack",
+		"docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
 		"build": "next build",
 		"start": "next start",
 		"lint": "biome check ./app ./components ./lib ./utils ./hooks",
@@ -90,11 +91,5 @@
 		"tailwindcss": "^4.2.4",
 		"typescript": "^6.0.3"
 	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@biomejs/biome",
-			"@tailwindcss/oxide",
-			"unrs-resolver"
-		]
-	}
+	"packageManager": "pnpm@11.1.2"
 }

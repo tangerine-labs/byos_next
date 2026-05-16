@@ -19,6 +19,26 @@ services:
       timeout: 5s
       retries: 5
 
+  db-migrate:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./migrations:/migrations:ro
+    networks:
+      - byos_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for f in /migrations/*.sql; do
+          echo "Applying $$f"
+          psql -h postgres -U postgres -d byos_db -v ON_ERROR_STOP=1 -f "$$f"
+        done
+
   byos-next:
     # image: ghcr.io/usetrmnl/byos_next:latest
     build:
@@ -29,12 +49,14 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/byos_db?sslmode=disable
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - byos_network

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { sql } from "kysely";
 import { db } from "./db";
 import { SQL_STATEMENTS } from "./sql-statements";
@@ -37,6 +38,8 @@ export async function checkDbConnection(): Promise<{
 }
 
 export async function getDbStatus() {
+	await connection();
+
 	if (!process.env.DATABASE_URL) {
 		return {
 			ready: false,

@@ -34,6 +34,7 @@
   - [Quickstart](#quickstart)
     - [Deploy to Vercel](#deploy-to-vercel)
     - [Run with Docker Compose (app + Postgres)](#run-with-docker-compose-app--postgres)
+    - [Docker Compose dev mode (hot reload)](#docker-compose-dev-mode-hot-reload)
     - [Run Locally](#run-locally)
   - [Environment](#environment)
     - [Renderer Options](#renderer-options)
@@ -75,16 +76,47 @@
    BETTER_AUTH_SECRET=a_random_32_character_secret
    ```
    `docker-compose.yml` reads from `.env` (not `.env.local`). Generate a secret with `openssl rand -base64 32`.
-2. Start the stack:
+2. Start the stack (production build):
    ```bash
-   docker-compose up -d
+   docker compose up -d
    # visit http://localhost:3000
    ```
+
+### Docker Compose dev mode (hot reload)
+
+Use this when you want Postgres in Docker but edit Next.js source on your host and see changes without rebuilding the image.
+
+1. Use the same `.env` as production Compose (see above).
+2. Start the dev stack:
+   ```bash
+   pnpm docker:dev
+   ```
+   Or without pnpm:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+   ```
+3. Open [http://localhost:3000](http://localhost:3000). Edits under `app/`, `components/`, `lib/`, etc. trigger Next.js fast refresh inside the container.
+
+Stop with `Ctrl+C` (foreground) or `docker compose -f docker-compose.yml -f docker-compose.dev.yml down`.
+
+`REACT_RENDERER=browser` in `.env` is supported in dev (headless Chrome is bundled in `Dockerfile.dev`, same as production). For faster iteration without Chrome, set `REACT_RENDERER=takumi`.
+
+**Rebuild the dev image** after changing `package.json` or `pnpm-lock.yaml`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build byos-next
+```
+
+**Browser renderer with dev:** list `docker-compose.dev.yml` before `docker-compose.browser.yml` so the dev Dockerfile is kept:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.browser.yml up --build
+```
 
 #### Browser-based renderer (optional)
 For pixel-perfect TRMNL Framework UI compatibility, run the browser renderer alongside a headless Chrome container:
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.browser.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.browser.yml up -d
 ```
 This sets `REACT_RENDERER=browser` and starts a Chromium debugger that renders recipes via `/recipes/[slug]/preview`. See the `Environment` section for renderer options.
 
@@ -126,7 +158,7 @@ Create `.env.local` (for `pnpm dev`) or `.env` (for Docker Compose) with the key
 
 ### Database Options
 - **Supabase or Neon:** run migrations in `migrations/` in order, or use the in-app Initialize button on first launch. **Note:** migration `0009_add_user_tenancy.sql` assumes a `postgres` superuser role. On managed providers where the connection role differs, edit `GRANT byos_app TO <your_role>` before running it (see [#46](https://github.com/usetrmnl/byos_next/issues/46)).
-- **Docker/Postgres:** set `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` in `.env`, then run `docker-compose up -d`.
+- **Docker/Postgres:** set `POSTGRES_PASSWORD` and `BETTER_AUTH_SECRET` in `.env`, then run `docker compose up -d` (production) or `pnpm docker:dev` (hot reload).
 - **No-DB mode:** run `pnpm dev` without DB env vars to preview screens only (device management disabled).
 
 ## Project Structure

@@ -17,7 +17,7 @@ RUN corepack enable pnpm
 # Install dependencies only when needed
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN pnpm install --frozen-lockfile --prod=false \
     && rm -rf ~/.npm ~/.pnpm-store /root/.cache
@@ -57,9 +57,11 @@ RUN groupadd -g 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 
 RUN mkdir -p .next/cache \
-    && chown -R nextjs:nodejs .next
+    && chown -R nextjs:nodejs .next \
+    && chmod +x docker-entrypoint.sh
 
 USER nextjs
 
@@ -68,5 +70,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-ENTRYPOINT []
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

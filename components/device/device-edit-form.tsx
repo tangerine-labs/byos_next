@@ -452,6 +452,7 @@ export default function DeviceEditForm({
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="800x480">800 × 480</SelectItem>
+										<SelectItem value="1600x1200">1600 × 1200</SelectItem>
 										<SelectItem value="1872x1404">1872 × 1404</SelectItem>
 										<SelectItem value="custom">Custom</SelectItem>
 									</SelectContent>

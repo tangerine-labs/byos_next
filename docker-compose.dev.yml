@@ -1,0 +1,23 @@
+# Dev overlay: hot-reload Next.js with bind-mounted source.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  byos-next:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      - NODE_ENV=development
+      - CHROME_EXECUTABLE_PATH=/headless-shell/headless-shell
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      # File watching inside Docker (required on macOS/Windows bind mounts)
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - .:/app
+      - byos_next_node_modules:/app/node_modules
+      - byos_next_next_cache:/app/.next
+    restart: "no"
+
+volumes:
+  byos_next_node_modules:
+  byos_next_next_cache:
