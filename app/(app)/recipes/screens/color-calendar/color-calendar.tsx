@@ -1,6 +1,7 @@
 import { Temporal } from "@/lib/temporal";
 import { PreSatori } from "@/utils/pre-satori";
 import { getDanishHolidayMap, isDanishHoliday } from "./danish-holidays";
+import { display6 } from "./tokens";
 
 const COPENHAGEN = "Europe/Copenhagen";
 
@@ -104,12 +105,20 @@ export default function ColorCalendar({
 	return (
 		<PreSatori useDoubling width={width} height={height}>
 			<div
-				className="flex h-full w-full flex-col bg-white text-black"
-				style={{ padding: pad }}
+				className="flex h-full w-full flex-col"
+				style={{
+					padding: pad,
+					backgroundColor: display6.white,
+					color: display6.black,
+				}}
 			>
 				<header
-					className="flex shrink-0 items-end justify-between border-b-4 border-black"
-					style={{ height: headerH, paddingBottom: Math.round(16 * scale) }}
+					className="flex shrink-0 items-end justify-between"
+					style={{
+						height: headerH,
+						paddingBottom: Math.round(16 * scale),
+						borderBottom: `4px solid ${display6.black}`,
+					}}
 				>
 					<h1
 						className="font-blockkie font-normal leading-none tracking-tight"
@@ -118,22 +127,32 @@ export default function ColorCalendar({
 						{monthTitle}
 					</h1>
 					<span
-						className="font-geneva9 text-neutral-600"
-						style={{ fontSize: Math.round(24 * scale) }}
+						className="font-geneva9"
+						style={{
+							fontSize: Math.round(24 * scale),
+							color: display6.blue,
+						}}
 					>
 						Danmark · helligdage
 					</span>
 				</header>
 
 				<div
-					className="grid shrink-0 grid-cols-7 border-b border-neutral-300"
-					style={{ height: weekdayH }}
+					className="grid shrink-0 grid-cols-7"
+					style={{
+						height: weekdayH,
+						borderBottom: `1px solid ${display6.black}`,
+					}}
 				>
 					{WEEKDAYS_DA.map((label) => (
 						<div
 							key={label}
-							className="flex items-center justify-center font-geneva9 font-bold uppercase text-neutral-700"
-							style={{ fontSize: weekdaySize, width: colW }}
+							className="flex items-center justify-center font-geneva9 font-bold uppercase"
+							style={{
+								fontSize: weekdaySize,
+								width: colW,
+								color: display6.black,
+							}}
 						>
 							{label}
 						</div>
@@ -146,18 +165,16 @@ export default function ColorCalendar({
 				>
 					{cells.map((cell, index) => {
 						const bg = cell.isHoliday
-							? "#dc2626"
+							? display6.red
 							: cell.inMonth
-								? "#ffffff"
-								: "#f5f5f5";
+								? display6.white
+								: display6.yellow;
 						const color = cell.isHoliday
-							? "#ffffff"
-							: cell.inMonth
-								? "#000000"
-								: "#a3a3a3";
+							? display6.white
+							: display6.black;
 						const border = cell.isToday
-							? "4px solid #000000"
-							: "1px solid #e5e5e5";
+							? `4px solid ${display6.black}`
+							: `1px solid ${display6.black}`;
 
 						return (
 							<div
