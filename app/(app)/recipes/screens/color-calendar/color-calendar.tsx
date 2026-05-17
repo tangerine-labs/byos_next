@@ -1,6 +1,12 @@
 import { Temporal } from "@/lib/temporal";
 import { PreSatori } from "@/utils/pre-satori";
-import { getDanishHolidayMap, isDanishHoliday } from "./danish-holidays";
+import {
+	getHolidayMap,
+	isHoliday,
+	type HolidayCountry,
+} from "./holidays";
+
+const HOLIDAY_COUNTRY: HolidayCountry = "DK";
 import { display6 } from "./tokens";
 
 const COPENHAGEN = "Europe/Copenhagen";
@@ -46,7 +52,7 @@ function buildMonthGrid(
 	displayYear: number,
 	displayMonth: number,
 	today: Temporal.PlainDate,
-	holidayYears: Map<number, ReturnType<typeof getDanishHolidayMap>>,
+	holidayYears: Map<number, ReturnType<typeof getHolidayMap>>,
 ): CalendarCell[] {
 	const firstOfMonth = Temporal.PlainDate.from({
 		year: displayYear,
@@ -63,7 +69,8 @@ function buildMonthGrid(
 		const inMonth = date.year === displayYear && date.month === displayMonth;
 
 		const holidays =
-			holidayYears.get(date.year) ?? getDanishHolidayMap(date.year);
+			holidayYears.get(date.year) ??
+			getHolidayMap(HOLIDAY_COUNTRY, date.year);
 		if (!holidayYears.has(date.year)) holidayYears.set(date.year, holidays);
 
 		cells.push({
@@ -72,7 +79,7 @@ function buildMonthGrid(
 			year: date.year,
 			inMonth,
 			isToday: Temporal.PlainDate.compare(date, today) === 0,
-			isHoliday: isDanishHoliday(date.year, date.month, date.day, holidays),
+			isHoliday: isHoliday(date.year, date.month, date.day, holidays),
 		});
 	}
 
@@ -90,10 +97,7 @@ export default function ColorCalendar({
 	const displayYear = today.year;
 	const displayMonth = today.month;
 
-	const holidayYears = new Map<
-		number,
-		ReturnType<typeof getDanishHolidayMap>
-	>();
+	const holidayYears = new Map<number, ReturnType<typeof getHolidayMap>>();
 	const cells = buildMonthGrid(displayYear, displayMonth, today, holidayYears);
 
 	// Layout tuned for 1600×1200; scales down for smaller previews
