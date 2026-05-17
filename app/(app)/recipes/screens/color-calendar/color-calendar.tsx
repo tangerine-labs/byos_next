@@ -4,23 +4,34 @@ import { getDanishHolidayMap, isDanishHoliday } from "./danish-holidays";
 import { display6 } from "./tokens";
 
 const COPENHAGEN = "Europe/Copenhagen";
+const LOCALE = "da-DK";
 
-const WEEKDAYS_DA = ["man", "tir", "ons", "tor", "fre", "lør", "søn"] as const;
+const monthYearFormat = new Intl.DateTimeFormat(LOCALE, {
+	month: "long",
+	year: "numeric",
+});
+const weekdayFormat = new Intl.DateTimeFormat(LOCALE, { weekday: "short" });
 
-const MONTHS_DA = [
-	"januar",
-	"februar",
-	"marts",
-	"april",
-	"maj",
-	"juni",
-	"juli",
-	"august",
-	"september",
-	"oktober",
-	"november",
-	"december",
-] as const;
+/** Monday 2024-01-01 — header order matches the Mon-first grid. */
+const WEEKDAY_REF_MONDAY = Temporal.PlainDate.from({
+	year: 2024,
+	month: 1,
+	day: 1,
+});
+
+function plainDateToDate(d: Temporal.PlainDate): Date {
+	return new Date(d.year, d.month - 1, d.day);
+}
+
+const WEEKDAY_LABELS = Array.from({ length: 7 }, (_, i) =>
+	weekdayFormat.format(
+		plainDateToDate(WEEKDAY_REF_MONDAY.add({ days: i })),
+	),
+);
+
+function formatMonthYear(year: number, month: number): string {
+	return monthYearFormat.format(new Date(year, month - 1, 1));
+}
 
 type CalendarCell = {
 	day: number;
@@ -100,7 +111,7 @@ export default function ColorCalendar({
 	const weekdaySize = Math.round(28 * scale);
 	const daySize = Math.round(52 * scale);
 
-	const monthTitle = `${MONTHS_DA[displayMonth - 1]} ${displayYear}`;
+	const monthTitle = formatMonthYear(displayYear, displayMonth);
 
 	return (
 		<PreSatori useDoubling width={width} height={height}>
@@ -144,7 +155,7 @@ export default function ColorCalendar({
 						borderBottom: `1px solid ${display6.black}`,
 					}}
 				>
-					{WEEKDAYS_DA.map((label) => (
+					{WEEKDAY_LABELS.map((label) => (
 						<div
 							key={label}
 							className="flex items-center justify-center font-geneva9 font-bold uppercase"
@@ -163,7 +174,7 @@ export default function ColorCalendar({
 					className="grid flex-1 grid-cols-7"
 					style={{ gridTemplateRows: `repeat(6, ${rowH}px)` }}
 				>
-					{cells.map((cell, index) => {
+					{cells.map((cell) => {
 						const bg = cell.isHoliday
 							? display6.red
 							: cell.inMonth
@@ -178,7 +189,7 @@ export default function ColorCalendar({
 
 						return (
 							<div
-								key={`${cell.year}-${cell.month}-${cell.day}-${index}`}
+								key={`${cell.year}-${cell.month}-${cell.day}`}
 								className="flex items-start justify-end font-blockkie leading-none"
 								style={{
 									width: colW,
