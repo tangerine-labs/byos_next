@@ -1,6 +1,13 @@
 import { Temporal } from "@/lib/temporal";
 
-/** Danish public holidays and commonly marked days (Europe/Copenhagen calendar). */
+/**
+ * Danish public holidays and commonly marked days (Europe/Copenhagen calendar).
+ *
+ * Intl and Temporal do not expose country holiday calendars; movable feasts use
+ * Computus plus Temporal date arithmetic. Rules are maintained here (not via
+ * date-holidays) to match this screen’s curated set: public holidays plus
+ * Grundlovsdag and Juleaften, without Fastelavn, 1 May, or Mothers Day.
+ */
 
 export type HolidayInfo = { name: string };
 

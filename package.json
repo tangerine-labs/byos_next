@@ -14,6 +14,7 @@
 		"lint": "biome check ./app ./components ./lib ./utils ./hooks",
 		"lint:fix": "biome check --write --unsafe ./app ./components ./lib ./utils ./hooks",
 		"typecheck": "tsc --noEmit",
+		"verify:danish-holidays": "npx --yes tsx scripts/verify-danish-holidays.ts",
 		"format": "biome format --write ./app ./components ./lib ./utils ./hooks",
 		"release:major": "pnpm version major -m 'chore(release): %s' && git push --follow-tags",
 		"release:minor": "pnpm version minor -m 'chore(release): %s' && git push --follow-tags",
