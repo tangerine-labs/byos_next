@@ -184,8 +184,11 @@ export async function GET(request: Request) {
 		};
 		logInfo("Display request successful", { source: "api/display", metadata });
 
-		// Check for firmware updates
-		const latestFirmware = await getLatestFirmware();
+		// Check for firmware updates. The upstream trmnl-fw S3 binary only fits
+		// the official TRMNL OG device family — flashing it onto third-party
+		// hardware (Seeed Xiao ePaper, Inkplate, Kobo, Kindle, Waveshare, etc.)
+		// will brick the unit, so the prompt is gated to known-compatible models.
+		const TRMNL_FIRMWARE_MODELS = new Set(["og_png", "og_plus"]);
 		const firmwareExtra: Record<string, unknown> = {
 			// Tell the firmware how to rotate the panel. The TRMNL panel is
 			// portrait-native, so a landscape orientation needs a 90° rotation.
@@ -193,20 +196,23 @@ export async function GET(request: Request) {
 			image_rotate: orientation === "landscape" ? 1 : 0,
 		};
 
-		if (
-			latestFirmware &&
-			isUpdateAvailable(device.firmware_version, latestFirmware.version)
-		) {
-			firmwareExtra.update_firmware = true;
-			firmwareExtra.firmware_url = latestFirmware.downloadUrl;
-			logInfo("Firmware update available", {
-				source: "api/display",
-				metadata: {
-					deviceId: device.friendly_id,
-					currentVersion: device.firmware_version,
-					latestVersion: latestFirmware.version,
-				},
-			});
+		if (device.model && TRMNL_FIRMWARE_MODELS.has(device.model)) {
+			const latestFirmware = await getLatestFirmware();
+			if (
+				latestFirmware &&
+				isUpdateAvailable(device.firmware_version, latestFirmware.version)
+			) {
+				firmwareExtra.update_firmware = true;
+				firmwareExtra.firmware_url = latestFirmware.downloadUrl;
+				logInfo("Firmware update available", {
+					source: "api/display",
+					metadata: {
+						deviceId: device.friendly_id,
+						currentVersion: device.firmware_version,
+						latestVersion: latestFirmware.version,
+					},
+				});
+			}
 		}
 
 		return buildDisplayResponse(
