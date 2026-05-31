@@ -1,11 +1,9 @@
 import { Temporal } from "@/lib/temporal";
 import { PreSatori } from "@/utils/pre-satori";
-import { getHolidayDates, type HolidayCountry } from "./holidays";
 import { display6 } from "./tokens";
 
-const HOLIDAY_COUNTRY: HolidayCountry = "DK";
-
 const COPENHAGEN = "Europe/Copenhagen";
+const EMPTY_HOLIDAYS = new Set<string>();
 const LOCALE = "da-DK";
 
 const monthYearFormat = new Intl.DateTimeFormat(LOCALE, {
@@ -26,9 +24,7 @@ function plainDateToDate(d: Temporal.PlainDate): Date {
 }
 
 const WEEKDAY_LABELS = Array.from({ length: 7 }, (_, i) =>
-	weekdayFormat.format(
-		plainDateToDate(WEEKDAY_REF_MONDAY.add({ days: i })),
-	),
+	weekdayFormat.format(plainDateToDate(WEEKDAY_REF_MONDAY.add({ days: i }))),
 );
 
 function formatMonthYear(year: number, month: number): string {
@@ -43,6 +39,17 @@ type CalendarCell = {
 	isToday: boolean;
 	isHoliday: boolean;
 };
+
+function holidaySetsByYear(
+	byYear: Record<number, string[]> | undefined,
+): Map<number, ReadonlySet<string>> {
+	const map = new Map<number, ReadonlySet<string>>();
+	if (!byYear) return map;
+	for (const [year, dates] of Object.entries(byYear)) {
+		map.set(Number(year), new Set(dates));
+	}
+	return map;
+}
 
 function buildMonthGrid(
 	displayYear: number,
@@ -64,11 +71,7 @@ function buildMonthGrid(
 		const date = gridStart.add({ days: i });
 		const inMonth = date.year === displayYear && date.month === displayMonth;
 
-		let dates = holidayYears.get(date.year);
-		if (!dates) {
-			dates = getHolidayDates(HOLIDAY_COUNTRY, date.year);
-			holidayYears.set(date.year, dates);
-		}
+		const dates = holidayYears.get(date.year) ?? EMPTY_HOLIDAYS;
 
 		cells.push({
 			day: date.day,
@@ -86,15 +89,17 @@ function buildMonthGrid(
 export default function ColorCalendar({
 	width = 1600,
 	height = 1200,
+	holidayDatesByYear,
 }: {
 	width?: number;
 	height?: number;
+	holidayDatesByYear?: Record<number, string[]>;
 }) {
 	const today = Temporal.Now.plainDateISO(COPENHAGEN);
 	const displayYear = today.year;
 	const displayMonth = today.month;
 
-	const holidayYears = new Map<number, ReadonlySet<string>>();
+	const holidayYears = holidaySetsByYear(holidayDatesByYear);
 	const cells = buildMonthGrid(displayYear, displayMonth, today, holidayYears);
 
 	// Layout tuned for 1600×1200; scales down for smaller previews
@@ -181,9 +186,7 @@ export default function ColorCalendar({
 							: cell.inMonth
 								? display6.white
 								: display6.yellow;
-						const color = cell.isHoliday
-							? display6.white
-							: display6.black;
+						const color = cell.isHoliday ? display6.white : display6.black;
 						const border = cell.isToday
 							? `4px solid ${display6.black}`
 							: `1px solid ${display6.black}`;

@@ -26,7 +26,10 @@ function getClient(country: HolidayCountry): Holidays {
 	return hd;
 }
 
-function isIncluded(country: HolidayCountry, h: HolidaysTypes.Holiday): boolean {
+function isIncluded(
+	country: HolidayCountry,
+	h: HolidaysTypes.Holiday,
+): boolean {
 	const { exclude, extraObservance } = CONFIG[country];
 	if (exclude.has(h.rule)) return false;
 	return (

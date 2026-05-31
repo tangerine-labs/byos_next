@@ -5,6 +5,8 @@ const serverExternalPackages = [
 	"@takumi-rs/core",
 	"@takumi-rs/helpers",
 	"@sparticuz/chromium-min",
+	"date-holidays",
+	"date-holidays-parser",
 ];
 
 const browserTracingIncludes: string[] = [];
