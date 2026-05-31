@@ -197,7 +197,7 @@
 		"published": true,
 		"createdAt": "2026-05-16T00:00:00Z",
 		"updatedAt": "2026-05-16T00:00:00Z",
-		"description": "Current month calendar with Danish public holidays highlighted in red. Optimized for 1600×1200 color e-ink.",
+		"description": "Current month calendar with Danish public holidays highlighted in red. Defaults to 1872×1404 (TRMNL X); the 4:3 layout scales to any canvas.",
 		"componentPath": "./screens/color-calendar",
 		"hasDataFetch": true,
 		"props": {},

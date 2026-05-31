@@ -87,8 +87,8 @@ function buildMonthGrid(
 }
 
 export default function ColorCalendar({
-	width = 1600,
-	height = 1200,
+	width = 1872,
+	height = 1404,
 	holidayDatesByYear,
 }: {
 	width?: number;
@@ -102,7 +102,8 @@ export default function ColorCalendar({
 	const holidayYears = holidaySetsByYear(holidayDatesByYear);
 	const cells = buildMonthGrid(displayYear, displayMonth, today, holidayYears);
 
-	// Layout tuned for 1600×1200; scales down for smaller previews
+	// Layout designed against a 1600×1200 reference; scales uniformly to the
+	// actual canvas (default 1872×1404 / TRMNL X → ×1.17, smaller previews → down)
 	const refW = 1600;
 	const refH = 1200;
 	const scale = Math.min(width / refW, height / refH);
