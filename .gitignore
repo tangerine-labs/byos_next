@@ -55,3 +55,6 @@ sync.sh
 
 # local planning notes
 .notes/
+
+# Claude Code per-machine state (permission allowlist, scheduler lock)
+.claude/
