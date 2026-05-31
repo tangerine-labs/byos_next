@@ -171,6 +171,27 @@
 		"version": "0.1.0",
 		"category": "display-components"
 	},
+	"meals-of-the-week": {
+		"title": "Meals of the week",
+		"published": true,
+		"createdAt": "2026-05-31T00:00:00Z",
+		"updatedAt": "2026-05-31T00:00:00Z",
+		"description": "Weekly weekday meal schedule (snack, lunch, dinner). Data refreshes every 15 minutes. Requires REACT_RENDERER=browser and the Chrome sidecar for TRMNL Framework styling.",
+		"componentPath": "./screens/meals-of-the-week",
+		"hasDataFetch": true,
+		"props": {
+			"weekdays": []
+		},
+		"params": {},
+		"tags": ["food", "schedule", "live-data"],
+		"author": {
+			"name": "BYOS",
+			"github": ""
+		},
+		"renderSettings": {},
+		"version": "0.1.0",
+		"category": "food"
+	},
 	"color-calendar": {
 		"title": "Color Calendar",
 		"published": true,
