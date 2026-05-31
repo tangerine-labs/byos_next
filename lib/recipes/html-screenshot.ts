@@ -15,9 +15,13 @@ export async function renderHtmlToImage(
 	const page = await browser.newPage();
 	try {
 		await page.setViewport({ width, height });
+		// `load` fires on DOMContentLoaded + main resources (CSS, fonts, primary
+		// images). Avoids `networkidle0`, which hangs whenever a liquid recipe
+		// keeps a long-poll, analytics ping, or background image fetch open —
+		// common enough that strict idle-wait timed out for nearly every recipe.
 		await page.setContent(html, {
-			waitUntil: "networkidle0",
-			timeout: 15000,
+			waitUntil: "load",
+			timeout: 30000,
 		});
 		const screenshot = await page.screenshot({
 			type: "png",
