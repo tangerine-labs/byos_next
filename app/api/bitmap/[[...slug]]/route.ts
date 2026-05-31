@@ -26,7 +26,12 @@ export async function GET(
 		// Always await params as required by Next.js 14/15
 		const { slug = ["not-found"] } = await params;
 		const bitmapPath = Array.isArray(slug) ? slug.join("/") : slug;
-		const recipeSlug = bitmapPath.replace(".bmp", "");
+		// Device firmware fetches either `<screen>.bmp` or `<screen>.png`; the
+		// display route picks the extension based on the device's image format.
+		const imageFormat: "bmp" | "png" = bitmapPath.endsWith(".png")
+			? "png"
+			: "bmp";
+		const recipeSlug = bitmapPath.replace(/\.(bmp|png)$/, "");
 
 		// Get width, height, and grayscale from query parameters
 		const { searchParams } = new URL(req.url);
@@ -64,11 +69,12 @@ export async function GET(
 		// Forward cookies so browser rendering can reuse the caller's auth session.
 		const cookieHeader = req.headers.get("cookie");
 
-		const recipeBuffer = await renderRecipeBitmap(
+		const recipeBuffer = await renderRecipeDeviceImage(
 			recipeSlug,
 			validWidth,
 			validHeight,
 			bitmapRender,
+			imageFormat,
 			userId,
 			cookieHeader || undefined,
 		);
@@ -79,15 +85,19 @@ export async function GET(
 			recipeBuffer.length === 0
 		) {
 			logger.warn(
-				`Failed to generate bitmap for ${recipeSlug}, returning fallback`,
+				`Failed to generate ${imageFormat} for ${recipeSlug}, returning fallback`,
 			);
-			const fallback = await renderFallbackBitmap();
-			return fallback;
+			return await renderFallback(
+				"not-found",
+				imageFormat,
+				validWidth,
+				validHeight,
+			);
 		}
 
 		return new Response(new Uint8Array(recipeBuffer), {
 			headers: {
-				"Content-Type": "image/bmp",
+				"Content-Type": imageFormat === "png" ? "image/png" : "image/bmp",
 				"Content-Length": recipeBuffer.length.toString(),
 			},
 		});
@@ -95,16 +105,22 @@ export async function GET(
 		logger.error("Error generating image:", error);
 
 		// Instead of returning an error, return the NotFoundScreen as a fallback
-		return await renderFallbackBitmap("Error occurred");
+		return await renderFallback(
+			"not-found",
+			"bmp",
+			DEFAULT_IMAGE_WIDTH,
+			DEFAULT_IMAGE_HEIGHT,
+		);
 	}
 }
 
-const renderRecipeBitmap = cache(
+const renderRecipeDeviceImage = cache(
 	async (
 		recipeId: string,
 		width: number,
 		height: number,
 		renderOptions: BitmapRenderOptions,
+		format: "bmp" | "png",
 		userId: string | null = null,
 		cookies?: string,
 	) => {
@@ -112,45 +128,54 @@ const renderRecipeBitmap = cache(
 			slug: recipeId,
 			imageWidth: width,
 			imageHeight: height,
-			formats: ["bitmap"],
+			formats: [format === "png" ? "png-dithered" : "bitmap"],
 			...renderOptions,
 			userId,
 			cookies,
 		});
-		return renders.bitmap ?? Buffer.from([]);
+		const buffer = format === "png" ? renders.pngDithered : renders.bitmap;
+		return buffer ?? Buffer.from([]);
 	},
 );
 
-const renderFallbackBitmap = cache(async (slug: string = "not-found") => {
-	try {
-		const renders = await renderRecipeOutputs({
-			slug,
-			Component: NotFoundScreen,
-			props: { slug },
-			config: null,
-			imageWidth: DEFAULT_IMAGE_WIDTH,
-			imageHeight: DEFAULT_IMAGE_HEIGHT,
-			formats: ["bitmap"],
-			grayscale: 2, // Default to 2 levels for fallback
-		});
+const renderFallback = cache(
+	async (
+		slug: string,
+		format: "bmp" | "png",
+		width: number,
+		height: number,
+	) => {
+		try {
+			const renders = await renderRecipeOutputs({
+				slug,
+				Component: NotFoundScreen,
+				props: { slug },
+				config: null,
+				imageWidth: width,
+				imageHeight: height,
+				formats: [format === "png" ? "png-dithered" : "bitmap"],
+				grayscale: format === "png" ? 16 : 2,
+			});
 
-		if (!renders.bitmap) {
-			throw new Error("Missing bitmap buffer for fallback");
+			const buffer = format === "png" ? renders.pngDithered : renders.bitmap;
+			if (!buffer) {
+				throw new Error(`Missing ${format} buffer for fallback`);
+			}
+
+			return new Response(new Uint8Array(buffer), {
+				headers: {
+					"Content-Type": format === "png" ? "image/png" : "image/bmp",
+					"Content-Length": buffer.length.toString(),
+				},
+			});
+		} catch (fallbackError) {
+			logger.error("Error generating fallback image:", fallbackError);
+			return new Response("Error generating image", {
+				status: 500,
+				headers: {
+					"Content-Type": "text/plain",
+				},
+			});
 		}
-
-		return new Response(new Uint8Array(renders.bitmap), {
-			headers: {
-				"Content-Type": "image/bmp",
-				"Content-Length": renders.bitmap.length.toString(),
-			},
-		});
-	} catch (fallbackError) {
-		logger.error("Error generating fallback image:", fallbackError);
-		return new Response("Error generating image", {
-			status: 500,
-			headers: {
-				"Content-Type": "text/plain",
-			},
-		});
-	}
-});
+	},
+);

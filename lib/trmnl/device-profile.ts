@@ -17,6 +17,16 @@ import {
 
 export const DEFAULT_MODEL_NAME = "og_plus";
 
+/**
+ * Firmware `Model` header values that don't match a registry `name`. The TRMNL
+ * X firmware reports "x", but the registry lists that 1872×1404 panel as "v2"
+ * (label "TRMNL X"). Without this, the lookup misses and the device falls back
+ * to og_plus (800×480, 1-bit), producing an image the X firmware rejects.
+ */
+const MODEL_ALIASES: Record<string, string> = {
+	x: "v2",
+};
+
 export type DeviceProfile = {
 	model: TrmnlModel;
 	palette: TrmnlPalette | null;
@@ -54,7 +64,8 @@ export async function getDeviceProfile(
 	modelName: string | null | undefined,
 	paletteOverride?: string | null,
 ): Promise<DeviceProfile> {
-	const requested = modelName?.trim() || DEFAULT_MODEL_NAME;
+	const reported = modelName?.trim() || DEFAULT_MODEL_NAME;
+	const requested = MODEL_ALIASES[reported] ?? reported;
 	let model = await findModel(requested);
 	let fallback = false;
 

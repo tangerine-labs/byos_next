@@ -316,3 +316,127 @@ export async function renderBmp(png: Buffer, options: RenderBmpOptions = {}) {
 	}
 	return renderGrayscaleBmp(png, options);
 }
+
+const hexToRgb = (hex: string): [number, number, number] => {
+	const num = Number.parseInt(hex.replace("#", "").trim(), 16);
+	return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff];
+};
+
+/**
+ * Same dithering pipeline as renderGrayscaleBmp, but encodes the dithered
+ * pixels as a compressed (indexed) PNG instead of a raw BMP. Used for device
+ * models whose firmware accepts PNG (e.g. the TRMNL X, 1872×1404): a raw BMP at
+ * their native resolution far exceeds the firmware's image-size limit, while the
+ * equivalent dithered PNG compresses well under it. The on-device pixels are
+ * identical to what the BMP path would produce.
+ */
+async function renderGrayscalePng(
+	png: Buffer,
+	options: RenderBmpOptions,
+): Promise<Buffer> {
+	const {
+		ditheringMethod = DitheringMethod.FLOYD_STEINBERG,
+		inverted = false,
+		grayscale = 2,
+		applyEdgeSnap = true,
+	} = options;
+
+	if (
+		!GRAYSCALE_LEVELS.includes(grayscale as (typeof GRAYSCALE_LEVELS)[number])
+	) {
+		throw new Error(
+			`Invalid grayscale value: ${grayscale}. Must be one of: ${GRAYSCALE_LEVELS.join(", ")}`,
+		);
+	}
+
+	const targetWidth = options.width ?? 800;
+	const targetHeight = options.height ?? 480;
+	const targetPixelCount = targetWidth * targetHeight;
+
+	const image = await loadAndResizePng(png, targetWidth, targetHeight);
+	const grayscaleImage = await image.grayscale().raw().toBuffer({
+		resolveWithObject: true,
+	});
+
+	const grayscaleData = new Uint8Array(targetPixelCount);
+	for (let i = 0; i < targetPixelCount; i++) {
+		grayscaleData[i] = grayscaleImage.data[i] as number;
+	}
+
+	const dithered = applyDithering(ditheringMethod, grayscaleData, {
+		width: targetWidth,
+		height: targetHeight,
+		levels: grayscale,
+		applyEdgeSnap,
+	});
+
+	const gray = Buffer.alloc(targetPixelCount);
+	for (let i = 0; i < targetPixelCount; i++) {
+		gray[i] = inverted ? 255 - dithered[i] : dithered[i];
+	}
+
+	return sharp(gray, {
+		raw: { width: targetWidth, height: targetHeight, channels: 1 },
+	})
+		.png({ compressionLevel: 9, palette: true, colours: grayscale })
+		.toBuffer();
+}
+
+/** Color-palette analogue of renderGrayscalePng. */
+async function renderColorPng(
+	png: Buffer,
+	options: RenderBmpOptions,
+): Promise<Buffer> {
+	const {
+		ditheringMethod = DitheringMethod.FLOYD_STEINBERG,
+		palette: hexPalette = [],
+	} = options;
+
+	if (hexPalette.length < 2) {
+		throw new Error("Color palette must include at least 2 colors");
+	}
+
+	const targetWidth = options.width ?? 800;
+	const targetHeight = options.height ?? 480;
+	const targetPixelCount = targetWidth * targetHeight;
+
+	const image = await loadAndResizePng(png, targetWidth, targetHeight);
+	const rgbImage = await image.removeAlpha().raw().toBuffer({
+		resolveWithObject: true,
+	});
+
+	const rgbData = new Uint8Array(targetPixelCount * 3);
+	for (let i = 0; i < targetPixelCount * 3; i++) {
+		rgbData[i] = rgbImage.data[i] as number;
+	}
+
+	const colorPalette = parseHexPalette(hexPalette);
+	const indices = applyColorDithering(ditheringMethod, rgbData, {
+		width: targetWidth,
+		height: targetHeight,
+		palette: colorPalette,
+	});
+
+	const rgbTriplets = hexPalette.map(hexToRgb);
+	const out = Buffer.alloc(targetPixelCount * 3);
+	for (let i = 0; i < targetPixelCount; i++) {
+		const [r, g, b] = rgbTriplets[indices[i]] ?? [0, 0, 0];
+		out[i * 3] = r;
+		out[i * 3 + 1] = g;
+		out[i * 3 + 2] = b;
+	}
+
+	return sharp(out, {
+		raw: { width: targetWidth, height: targetHeight, channels: 3 },
+	})
+		.png({ compressionLevel: 9, palette: true, colours: hexPalette.length })
+		.toBuffer();
+}
+
+/** Render a recipe PNG to a dithered, device-ready PNG (see renderGrayscalePng). */
+export async function renderPng(png: Buffer, options: RenderBmpOptions = {}) {
+	if (options.palette && options.palette.length > 0) {
+		return renderColorPng(png, options);
+	}
+	return renderGrayscalePng(png, options);
+}

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database/db";
 import { checkDbConnection } from "@/lib/database/utils";
-import { buildBitmapQueryParams } from "@/lib/display/color-palette";
+import {
+	bitmapOptionsFromDevice,
+	buildBitmapQueryParams,
+	deviceImageFormat,
+} from "@/lib/display/color-palette";
 import { getLatestFirmware, isUpdateAvailable } from "@/lib/firmware";
 import { logError, logInfo } from "@/lib/logger";
 import { DeviceDisplayMode } from "@/lib/mixup/constants";
@@ -104,6 +108,14 @@ export async function GET(request: Request) {
 			paletteId: device.palette_id,
 		});
 
+		// Pick BMP vs PNG: high-res panels (e.g. TRMNL X) get PNG because a raw
+		// BMP at their native resolution overflows the firmware's image buffer.
+		const imageExt = deviceImageFormat(
+			deviceWidth,
+			deviceHeight,
+			bitmapOptionsFromDevice(device),
+		);
+
 		// Build common query params for image URLs. Include access_token so the
 		// device's bitmap fetch can scope DB lookups to the device owner —
 		// TRMNL firmware doesn't add the Access-Token header on image URLs, so
@@ -142,12 +154,12 @@ export async function GET(request: Request) {
 						dynamicRefreshRate = 60;
 					}
 				}
-				imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.bmp?${baseQueryParams}`;
+				imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.${imageExt}?${baseQueryParams}`;
 				break;
 
 			case DeviceDisplayMode.MIXUP:
 				if (device.mixup_id) {
-					imageUrl = `${baseUrl}/mixup/${device.mixup_id}.bmp?${baseQueryParams}`;
+					imageUrl = `${baseUrl}/mixup/${device.mixup_id}.${imageExt}?${baseQueryParams}`;
 					const metadata = {
 						deviceId: device.friendly_id,
 						mixupId: device.mixup_id,
@@ -157,7 +169,7 @@ export async function GET(request: Request) {
 						metadata,
 					});
 				} else {
-					imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.bmp?${baseQueryParams}`;
+					imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.${imageExt}?${baseQueryParams}`;
 				}
 				dynamicRefreshRate = calculateRefreshRate(
 					device.refresh_schedule as unknown as RefreshSchedule,
@@ -172,7 +184,7 @@ export async function GET(request: Request) {
 					180,
 					device.timezone || "UTC",
 				);
-				imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.bmp?${baseQueryParams}`;
+				imageUrl = `${baseUrl}/${screenToDisplay || "not-found"}.${imageExt}?${baseQueryParams}`;
 				break;
 		}
 
@@ -221,7 +233,7 @@ export async function GET(request: Request) {
 
 		return buildDisplayResponse(
 			imageUrl,
-			`${screenToDisplay || "not-found"}_${uniqueId}.bmp`,
+			`${screenToDisplay || "not-found"}_${uniqueId}.${imageExt}`,
 			dynamicRefreshRate,
 			firmwareExtra,
 		);

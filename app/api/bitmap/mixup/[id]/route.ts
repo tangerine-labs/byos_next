@@ -14,7 +14,7 @@ import {
 	logger,
 	renderRecipeToImage,
 } from "@/lib/recipes/recipe-renderer";
-import { DitheringMethod, renderBmp } from "@/utils/render-bmp";
+import { DitheringMethod, renderBmp, renderPng } from "@/utils/render-bmp";
 
 export async function GET(
 	req: NextRequest,
@@ -22,7 +22,8 @@ export async function GET(
 ) {
 	try {
 		const { id } = await params;
-		const mixupId = id.replace(".bmp", "");
+		const imageFormat: "bmp" | "png" = id.endsWith(".png") ? "png" : "bmp";
+		const mixupId = id.replace(/\.(bmp|png)$/, "");
 
 		// Get width, height, and grayscale from query parameters
 		const { searchParams } = new URL(req.url);
@@ -113,11 +114,12 @@ export async function GET(
 			height,
 			bitmapRender,
 			device.user_id,
+			imageFormat,
 		);
 
 		return new Response(new Uint8Array(compositeBuffer), {
 			headers: {
-				"Content-Type": "image/bmp",
+				"Content-Type": imageFormat === "png" ? "image/png" : "image/bmp",
 				"Content-Length": compositeBuffer.length.toString(),
 			},
 		});
@@ -163,6 +165,7 @@ async function renderMixupComposite(
 	height: number,
 	renderOptions: BitmapRenderOptions,
 	userId: string,
+	format: "bmp" | "png" = "bmp",
 ): Promise<Buffer> {
 	// Render all slots in parallel
 	const slotRenders = await Promise.all(
@@ -212,8 +215,8 @@ async function renderMixupComposite(
 		.png()
 		.toBuffer();
 
-	// Convert to BMP with dithering
-	const bmpBuffer = await renderBmp(compositedPng, {
+	// Convert to the device's image format with dithering
+	const ditherOptions = {
 		ditheringMethod: DitheringMethod.ATKINSON,
 		width,
 		height,
@@ -221,7 +224,9 @@ async function renderMixupComposite(
 		...(renderOptions.palette
 			? { palette: renderOptions.palette }
 			: { grayscale: renderOptions.grayscale ?? 2 }),
-	});
+	};
 
-	return bmpBuffer;
+	return format === "png"
+		? renderPng(compositedPng, ditherOptions)
+		: renderBmp(compositedPng, ditherOptions);
 }

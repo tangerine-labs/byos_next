@@ -12,7 +12,7 @@ import {
 	isLiquidRecipe,
 	renderLiquidRecipe,
 } from "@/lib/recipes/liquid-renderer";
-import { DitheringMethod, renderBmp } from "@/utils/render-bmp";
+import { DitheringMethod, renderBmp, renderPng } from "@/utils/render-bmp";
 import { renderWithSatori } from "./renderers/satori";
 import { renderWithTakumi } from "./renderers/takumi";
 
@@ -240,7 +240,7 @@ export const getRecipeImageOptions = (
 	};
 };
 
-type RenderFormats = Array<"bitmap" | "png">;
+type RenderFormats = Array<"bitmap" | "png" | "png-dithered">;
 
 type RenderOptions = {
 	slug: string;
@@ -260,11 +260,14 @@ type RenderOptions = {
 type RenderResults = {
 	bitmap: Buffer | null;
 	png: Buffer | null;
+	/** Dithered, device-ready PNG (for firmware that accepts PNG, e.g. TRMNL X). */
+	pngDithered: Buffer | null;
 };
 
 const getDefaultRenderResults = (): RenderResults => ({
 	bitmap: null,
 	png: null,
+	pngDithered: null,
 });
 
 export const renderRecipeOutputs = cache(
@@ -285,8 +288,9 @@ export const renderRecipeOutputs = cache(
 		const results = getDefaultRenderResults();
 		const needsPng = formats.includes("png");
 		const needsBitmap = formats.includes("bitmap");
+		const needsPngDithered = formats.includes("png-dithered");
 
-		if (!needsPng && !needsBitmap) return results;
+		if (!needsPng && !needsBitmap && !needsPngDithered) return results;
 
 		const imageOptions = getRecipeImageOptions(config, imageWidth, imageHeight);
 		const rendererType = getRendererType();
@@ -360,6 +364,23 @@ export const renderRecipeOutputs = cache(
 				});
 			} catch (error) {
 				logger.error(`Error generating bitmap for ${slug}:`, error);
+			}
+		}
+
+		if (needsPngDithered) {
+			try {
+				results.pngDithered = await renderPng(pngBuffer, {
+					ditheringMethod: DitheringMethod.FLOYD_STEINBERG,
+					width: imageWidth,
+					height: imageHeight,
+					applyEdgeSnap: palette
+						? false
+						: (config?.renderSettings?.applyEdgeSnap ?? true),
+					...(palette ? { palette } : {}),
+					...(grayscale !== undefined && !palette && { grayscale }),
+				});
+			} catch (error) {
+				logger.error(`Error generating dithered PNG for ${slug}:`, error);
 			}
 		}
 
