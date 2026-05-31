@@ -10,7 +10,11 @@ export async function GET(request: Request) {
 	try {
 		const macAddress = request.headers.get("ID")?.toUpperCase();
 		const apiKey = request.headers.get("Access-Token");
-		const model = request.headers.get("Model");
+		// Some firmware variants omit the Model header on /api/setup, or send it
+		// as an empty string, but populate it on /api/display. Coerce both
+		// missing and empty to og_png so setup can complete; the real model is
+		// patched onto the row from the first display call via findOrCreateDevice.
+		const model = request.headers.get("Model")?.trim() || "og_png";
 		const { ready } = await checkDbConnection();
 
 		if (!ready) {
@@ -53,20 +57,6 @@ export async function GET(request: Request) {
 					friendly_id: null,
 					image_url: null,
 					message: "ID header is required",
-				},
-				{ status: 200 },
-			); // Status 200 for device compatibility
-		}
-
-		// TRMNL API requires Model header
-		if (!model) {
-			return NextResponse.json(
-				{
-					status: 400,
-					api_key: null,
-					friendly_id: null,
-					image_url: null,
-					message: "Model header is required",
 				},
 				{ status: 200 },
 			); // Status 200 for device compatibility
