@@ -141,6 +141,12 @@ export default function DeviceEditForm({
 		grayscale: editedDevice.grayscale,
 		paletteId: editedDevice.palette_id,
 	});
+	// Append the device's access token so /api/bitmap scopes recipe lookups to
+	// the device owner; otherwise user-installed screens resolve to the
+	// shared-only set and render as "Screen Not Found" (see device-view.tsx).
+	const bitmapQueryWithToken = `${bitmapQuery}&access_token=${encodeURIComponent(
+		editedDevice.api_key,
+	)}`;
 
 	const isMixup =
 		editedDevice.display_mode === DeviceDisplayMode.MIXUP &&
@@ -150,8 +156,8 @@ export default function DeviceEditForm({
 		!!editedDevice.playlist_id;
 
 	const heroSrc = isMixup
-		? `/api/bitmap/mixup/${editedDevice.mixup_id}.bmp?${bitmapQuery}`
-		: `/api/bitmap/${editedDevice?.screen || "simple-text"}.bmp?${bitmapQuery}`;
+		? `/api/bitmap/mixup/${editedDevice.mixup_id}.bmp?${bitmapQueryWithToken}`
+		: `/api/bitmap/${editedDevice?.screen || "simple-text"}.bmp?${bitmapQueryWithToken}`;
 
 	return (
 		<form id="device-edit-form" onSubmit={onSubmit}>

@@ -151,6 +151,14 @@ export default function DeviceView({
 		grayscale: device.grayscale,
 		paletteId: device.palette_id,
 	});
+	// Include the device's access token so /api/bitmap can scope recipe lookups
+	// to the device owner. Without it the lookup falls back to shared-only
+	// (user_id IS NULL) recipes and user-installed screens render as "Screen Not
+	// Found" in the preview — even though the firmware works, because /api/display
+	// already appends this token to the bitmap URL it hands the device.
+	const bitmapQueryWithToken = `${bitmapQuery}&access_token=${encodeURIComponent(
+		device.api_key,
+	)}`;
 
 	const status: "online" | "offline" =
 		device.status === "online" ? "online" : "offline";
@@ -166,10 +174,10 @@ export default function DeviceView({
 	const isMixup =
 		device.display_mode === DeviceDisplayMode.MIXUP && device.mixup_id;
 	const heroSrc = isPlaylist
-		? `/api/bitmap/${playlistScreens[0].screen || "simple-text"}.bmp?${bitmapQuery}`
+		? `/api/bitmap/${playlistScreens[0].screen || "simple-text"}.bmp?${bitmapQueryWithToken}`
 		: isMixup
-			? `/api/bitmap/mixup/${device.mixup_id}.bmp?${bitmapQuery}`
-			: `/api/bitmap/${device?.screen || "simple-text"}.bmp?${bitmapQuery}`;
+			? `/api/bitmap/mixup/${device.mixup_id}.bmp?${bitmapQueryWithToken}`
+			: `/api/bitmap/${device?.screen || "simple-text"}.bmp?${bitmapQueryWithToken}`;
 
 	return (
 		<div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
