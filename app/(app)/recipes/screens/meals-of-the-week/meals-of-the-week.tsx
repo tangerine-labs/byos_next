@@ -17,8 +17,27 @@ export default function MealsOfTheWeek({
 		<>
 			<link rel="stylesheet" href="https://trmnl.com/css/latest/plugins.css" />
 			<script src="https://trmnl.com/js/latest/plugins.js" defer />
-			<div className="environment trmnl" style={{ width, height }}>
-				<div className="screen">
+			<div
+				className="environment trmnl"
+				style={{
+					width,
+					height,
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					background: "#fff",
+				}}
+			>
+				{/* The TRMNL Framework .screen is a fixed 800×480; scale it to fill
+				    larger panels (e.g. TRMNL X 1872×1404) centered on white. OG
+				    devices render at 800×480 so the scale is 1 (no change). */}
+				<div
+					className="screen"
+					style={{
+						transform: `scale(${Math.min(width / 800, height / 480)})`,
+						transformOrigin: "center",
+					}}
+				>
 					<div className="view view--full">
 						<div className="layout layout--col gap">
 							<div className="title title--large lg:title--xlarge mb--large">
