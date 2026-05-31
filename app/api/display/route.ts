@@ -104,8 +104,12 @@ export async function GET(request: Request) {
 			paletteId: device.palette_id,
 		});
 
-		// Build common query params for image URLs
-		const baseQueryParams = `${bitmapQuery}${headers.base64 ? "&base64=true" : ""}`;
+		// Build common query params for image URLs. Include access_token so the
+		// device's bitmap fetch can scope DB lookups to the device owner —
+		// TRMNL firmware doesn't add the Access-Token header on image URLs, so
+		// without this, /api/bitmap can't tell which user owns the screen and
+		// user-installed liquid recipes fall back to a not-found bitmap.
+		const baseQueryParams = `${bitmapQuery}${headers.base64 ? "&base64=true" : ""}&access_token=${encodeURIComponent(headers.apiKey)}`;
 
 		let dynamicRefreshRate = 180;
 		let imageUrl: string;
@@ -143,7 +147,7 @@ export async function GET(request: Request) {
 
 			case DeviceDisplayMode.MIXUP:
 				if (device.mixup_id) {
-					imageUrl = `${baseUrl}/mixup/${device.mixup_id}.bmp?${baseQueryParams}&access_token=${encodeURIComponent(headers.apiKey)}`;
+					imageUrl = `${baseUrl}/mixup/${device.mixup_id}.bmp?${baseQueryParams}`;
 					const metadata = {
 						deviceId: device.friendly_id,
 						mixupId: device.mixup_id,

@@ -50,9 +50,15 @@ export async function GET(
 			`Bitmap request for: ${bitmapPath} in ${validWidth}x${validHeight} with ${colorModeLabel}`,
 		);
 
-		// Resolve the device owner so DB queries are scoped to the right user
-		const userId = headers.apiKey
-			? await resolveUserIdFromApiKey(headers.apiKey)
+		// Resolve the device owner so DB queries are scoped to the right user.
+		// TRMNL firmware typically does NOT send Access-Token when fetching the
+		// bitmap URL it got from /api/display — accept it as a query param too,
+		// matching the mixup bitmap route. Without this the lookup falls back to
+		// shared-only (user_id IS NULL) and user-installed recipes vanish.
+		const accessToken =
+			headers.apiKey ?? searchParams.get("access_token") ?? null;
+		const userId = accessToken
+			? await resolveUserIdFromApiKey(accessToken)
 			: null;
 
 		// Forward cookies so browser rendering can reuse the caller's auth session.
