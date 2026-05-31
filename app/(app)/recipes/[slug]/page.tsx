@@ -15,6 +15,7 @@ import { RecipePreviewStage } from "@/components/recipes/recipe-preview-stage";
 import RecipeProps from "@/components/recipes/recipe-props";
 import { ScreenParamsForm } from "@/components/recipes/screen-params-form";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentUserId } from "@/lib/auth/get-user";
 import { withUserScope } from "@/lib/database/scoped-db";
 import { checkDbConnection } from "@/lib/database/utils";
 import LiquidPreview from "@/lib/recipes/liquid-preview";
@@ -83,6 +84,7 @@ const LiquidRenderComponent = ({
 	imageWidth,
 	imageHeight,
 	customFieldOverrides,
+	userId,
 }: {
 	slug: string;
 	format: "bitmap" | "png" | "react";
@@ -90,8 +92,11 @@ const LiquidRenderComponent = ({
 	imageWidth: number;
 	imageHeight: number;
 	customFieldOverrides?: Record<string, unknown>;
+	userId?: string | null;
 }) => {
-	const result = use(renderLiquidRecipe(slug, customFieldOverrides));
+	const result = use(
+		renderLiquidRecipe(slug, customFieldOverrides, userId ?? undefined),
+	);
 
 	if (!result) {
 		return <EmptyState>Failed to render liquid template</EmptyState>;
@@ -429,7 +434,11 @@ export default async function RecipePage({
 		const title = liquidMeta.name;
 		const description = liquidMeta.description;
 
-		const liquidSettings = await fetchLiquidRecipeSettings(slug);
+		const userId = await getCurrentUserId();
+		const liquidSettings = await fetchLiquidRecipeSettings(
+			slug,
+			userId ?? undefined,
+		);
 		const customFields = liquidSettings?.custom_fields ?? [];
 		const paramDefinitions = customFieldsToParamDefinitions(customFields);
 		const hasParams = Object.keys(paramDefinitions).length > 0;
@@ -476,6 +485,7 @@ export default async function RecipePage({
 									imageWidth={imageWidth}
 									imageHeight={imageHeight}
 									customFieldOverrides={storedValues}
+									userId={userId}
 								/>
 							</Suspense>
 						}
@@ -488,6 +498,7 @@ export default async function RecipePage({
 									imageWidth={imageWidth}
 									imageHeight={imageHeight}
 									customFieldOverrides={storedValues}
+									userId={userId}
 								/>
 							</Suspense>
 						}
@@ -500,6 +511,7 @@ export default async function RecipePage({
 									imageWidth={imageWidth}
 									imageHeight={imageHeight}
 									customFieldOverrides={storedValues}
+									userId={userId}
 								/>
 							</Suspense>
 						}
