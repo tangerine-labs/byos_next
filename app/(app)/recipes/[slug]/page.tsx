@@ -255,6 +255,7 @@ const renderAllFormats = cache(
 		config: RecipeConfig,
 		imageWidth: number,
 		imageHeight: number,
+		userId?: string | null,
 	) => {
 		const propsWithDimensions = addDimensionsToProps(
 			props,
@@ -280,6 +281,7 @@ const renderAllFormats = cache(
 				config,
 				imageWidth,
 				imageHeight,
+				userId,
 			});
 		} catch (error) {
 			logger.error(`Error generating formats for ${slug}:`, error);
@@ -298,12 +300,14 @@ const RenderComponent = ({
 	title,
 	imageWidth,
 	imageHeight,
+	userId,
 }: {
 	slug: string;
 	format: "bitmap" | "png" | "react";
 	title: string;
 	imageWidth: number;
 	imageHeight: number;
+	userId?: string | null;
 }) => {
 	const configResult = use(fetchRecipeConfig(slug));
 	if (!configResult) return <EmptyState>Configuration not found</EmptyState>;
@@ -314,7 +318,11 @@ const RenderComponent = ({
 	const config = configResult;
 	const Component = componentResult;
 
-	const propsResult = use(Promise.resolve(fetchRecipeProps(slug, config)));
+	const propsResult = use(
+		Promise.resolve(
+			fetchRecipeProps(slug, config, undefined, userId ?? undefined),
+		),
+	);
 	const propsWithDimensions = addDimensionsToProps(
 		propsResult,
 		imageWidth,
@@ -353,6 +361,7 @@ const RenderComponent = ({
 				config,
 				imageWidth,
 				imageHeight,
+				userId,
 			),
 		),
 	);
@@ -639,6 +648,9 @@ export default async function RecipePage({
 	const screenParams = config.params
 		? await getScreenParams(slug, config.params)
 		: {};
+	// Render the preview as the current user so recipes that fetch per-tenant
+	// data (e.g. google-calendar reading OAuth tokens) see the right scope.
+	const userId = await getCurrentUserId();
 
 	return (
 		<div className="@container">
@@ -683,6 +695,7 @@ export default async function RecipePage({
 								title={config.title}
 								imageWidth={imageWidth}
 								imageHeight={imageHeight}
+								userId={userId}
 							/>
 						</Suspense>
 					}
@@ -694,6 +707,7 @@ export default async function RecipePage({
 								title={config.title}
 								imageWidth={imageWidth}
 								imageHeight={imageHeight}
+								userId={userId}
 							/>
 						</Suspense>
 					}
@@ -705,6 +719,7 @@ export default async function RecipePage({
 								title={config.title}
 								imageWidth={imageWidth}
 								imageHeight={imageHeight}
+								userId={userId}
 							/>
 						</Suspense>
 					}
@@ -756,7 +771,7 @@ export default async function RecipePage({
 								</div>
 							}
 						>
-							<PropsDisplay slug={slug} config={config} />
+							<PropsDisplay slug={slug} config={config} userId={userId} />
 						</Suspense>
 					</SectionCard>
 				)}
@@ -768,11 +783,17 @@ export default async function RecipePage({
 const PropsDisplay = ({
 	slug,
 	config,
+	userId,
 }: {
 	slug: string;
 	config: RecipeConfig;
+	userId?: string | null;
 }) => {
-	const propsResult = use(Promise.resolve(fetchRecipeProps(slug, config)));
+	const propsResult = use(
+		Promise.resolve(
+			fetchRecipeProps(slug, config, undefined, userId ?? undefined),
+		),
+	);
 	return (
 		<RecipeProps props={propsResult} slug={slug} refreshAction={refreshData} />
 	);
