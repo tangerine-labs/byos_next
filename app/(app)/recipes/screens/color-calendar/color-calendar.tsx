@@ -139,13 +139,13 @@ export default function ColorCalendar({
 					}}
 				>
 					<h1
-						className="font-blockkie font-normal leading-none tracking-tight"
+						className="font-inter font-normal leading-none tracking-tight"
 						style={{ fontSize: titleSize }}
 					>
 						{monthTitle}
 					</h1>
 					<span
-						className="font-geneva9"
+						className="font-inter"
 						style={{
 							fontSize: Math.round(24 * scale),
 							color: display6.blue,
@@ -165,7 +165,7 @@ export default function ColorCalendar({
 					{WEEKDAY_LABELS.map((label) => (
 						<div
 							key={label}
-							className="flex items-center justify-center font-geneva9 font-bold uppercase"
+							className="flex items-center justify-center font-inter font-bold uppercase"
 							style={{
 								fontSize: weekdaySize,
 								width: colW,
@@ -195,7 +195,7 @@ export default function ColorCalendar({
 						return (
 							<div
 								key={`${cell.year}-${cell.month}-${cell.day}`}
-								className="flex items-start justify-end font-blockkie leading-none"
+								className="flex items-start justify-end font-inter leading-none"
 								style={{
 									width: colW,
 									height: rowH,
