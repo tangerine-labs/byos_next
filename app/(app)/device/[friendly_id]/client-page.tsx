@@ -73,6 +73,7 @@ export default function DeviceClientPage({
 
 			// Check if current dimensions match a preset
 			if (width === 800 && height === 480) return "800x480";
+			if (width === 1600 && height === 1200) return "1600x1200";
 			if (width === 1872 && height === 1404) return "1872x1404";
 			return "custom";
 		},

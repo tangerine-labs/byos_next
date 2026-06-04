@@ -48,6 +48,7 @@ import { formatTimezone, timezones } from "@/utils/helpers";
 
 const DEVICE_SIZE_PRESETS = {
 	"800x480": { width: 800, height: 480 },
+	"1600x1200": { width: 1600, height: 1200 }, // Inky Impression 13.3"
 	"1872x1404": { width: 1872, height: 1404 },
 	custom: null,
 } as const;
