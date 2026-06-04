@@ -99,13 +99,25 @@ export const isTimeInRange = (
 	return timeToCheck >= startTime && timeToCheck < endTime;
 };
 
+/**
+ * Coerce a refresh rate to a positive integer. `refresh_schedule` is a JSON
+ * column and its numbers can arrive as strings (e.g. from number-input form
+ * values), which would otherwise serialize as a string and break clients that
+ * expect an int (the TRMNL firmware unmarshals `refresh_rate` into an int).
+ */
+export const coerceRefreshRate = (value: unknown, fallback: number): number => {
+	const n = Math.trunc(Number(value));
+	return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 export const calculateRefreshRate = (
 	refreshSchedule: RefreshSchedule | null,
 	defaultRefreshRate: number,
 	timezone: string = timezones[0].value,
 ): number => {
+	const fallback = coerceRefreshRate(defaultRefreshRate, 900);
 	if (!refreshSchedule) {
-		return defaultRefreshRate;
+		return fallback;
 	}
 
 	const now = new Date();
@@ -124,11 +136,11 @@ export const calculateRefreshRate = (
 
 	for (const range of refreshSchedule.time_ranges as TimeRange[]) {
 		if (isTimeInRange(currentTimeString, range.start_time, range.end_time)) {
-			return range.refresh_rate;
+			return coerceRefreshRate(range.refresh_rate, fallback);
 		}
 	}
 
-	return refreshSchedule.default_refresh_rate;
+	return coerceRefreshRate(refreshSchedule.default_refresh_rate, fallback);
 };
 
 export const getActivePlaylistItem = async (
@@ -523,7 +535,8 @@ export const buildDisplayResponse = (
 			status: 0,
 			image_url: imageUrl,
 			filename,
-			refresh_rate: refreshRate,
+			// Always an int — clients (TRMNL firmware) reject a stringified rate.
+			refresh_rate: coerceRefreshRate(refreshRate, 900),
 			reset_firmware: false,
 			update_firmware: false,
 			firmware_url: null,

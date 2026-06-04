@@ -8,7 +8,7 @@ import {
 	DEFAULT_IMAGE_WIDTH,
 } from "@/lib/recipes/recipe-renderer";
 import type { Device } from "@/lib/types";
-import { parseRequestHeaders } from "../utils";
+import { coerceRefreshRate, parseRequestHeaders } from "../utils";
 
 /**
  * GET /api/display/current
@@ -89,7 +89,12 @@ export async function GET(request: Request) {
 		const refreshSchedule = deviceData.refresh_schedule as {
 			default_refresh_rate: number;
 		} | null;
-		const refreshRate = refreshSchedule?.default_refresh_rate || 180;
+		// Coerce: the JSON column may hold a stringified rate, which must not
+		// reach the response as a string (clients expect an int).
+		const refreshRate = coerceRefreshRate(
+			refreshSchedule?.default_refresh_rate,
+			180,
+		);
 
 		logInfo("Current display request successful", {
 			source: "api/display/current",

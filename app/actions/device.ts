@@ -5,8 +5,30 @@ import { getCurrentUserId } from "@/lib/auth/get-user";
 import { db } from "@/lib/database/db";
 import { withUserScope } from "@/lib/database/scoped-db";
 import { checkDbConnection } from "@/lib/database/utils";
-import type { Device, Log } from "@/lib/types";
+import type { Device, Log, RefreshSchedule } from "@/lib/types";
 import { generateFriendlyId } from "@/utils/helpers";
+
+/** Coerce a refresh rate to a positive int (form number-inputs yield strings). */
+const toRate = (value: unknown, fallback: number): number => {
+	const n = Math.trunc(Number(value));
+	return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+/**
+ * Ensure refresh-rate fields are stored as numbers, not strings. The schedule
+ * is a JSON column and number-input form values arrive as strings, which would
+ * later serialize into the /api/display response as a string and break clients
+ * that expect an int.
+ */
+function normalizeRefreshSchedule(schedule: RefreshSchedule): RefreshSchedule {
+	return {
+		default_refresh_rate: toRate(schedule.default_refresh_rate, 900),
+		time_ranges: (schedule.time_ranges ?? []).map((range) => ({
+			...range,
+			refresh_rate: toRate(range.refresh_rate, 3600),
+		})),
+	};
+}
 
 /**
  * Fetch a single device by friendly_id
@@ -201,7 +223,7 @@ export async function updateDevice(
 	if (device.timezone !== undefined) updateData.timezone = device.timezone;
 	if (device.refresh_schedule !== undefined)
 		updateData.refresh_schedule = device.refresh_schedule
-			? JSON.stringify(device.refresh_schedule)
+			? JSON.stringify(normalizeRefreshSchedule(device.refresh_schedule))
 			: null;
 	if (device.screen !== undefined) updateData.screen = device.screen;
 	if (device.playlist_id !== undefined)
