@@ -214,6 +214,49 @@
 		"version": "0.1.0",
 		"category": "calendar"
 	},
+	"google-calendar": {
+		"title": "Google Calendar",
+		"published": true,
+		"createdAt": "2026-06-04T00:00:00Z",
+		"updatedAt": "2026-06-04T00:00:00Z",
+		"description": "Your Google Calendar: a small month overview (red = Danish holidays, green = weekends/vacation) plus a Monday-first week view listing each day's events. Connect via the dashboard. Defaults to 1600×1200 (Inky Impression 13.3); scales to any panel.",
+		"componentPath": "./screens/google-calendar",
+		"hasDataFetch": true,
+		"props": {},
+		"params": {
+			"vacationCalendar": {
+				"type": "string",
+				"label": "Vacation calendar name",
+				"description": "All-day events from any calendar whose name matches this (case-insensitive substring) colour their days green as vacation. Defaults to 'ferie'.",
+				"default": "ferie",
+				"placeholder": "ferie"
+			},
+			"country": {
+				"type": "string",
+				"label": "Holiday country",
+				"description": "ISO country code for public-holiday highlighting. Only 'DK' is supported today.",
+				"default": "DK",
+				"placeholder": "DK"
+			},
+			"showWeekNumbers": {
+				"type": "boolean",
+				"label": "Show ISO week number",
+				"description": "Display the ISO week number in the week-view header.",
+				"default": "true"
+			}
+		},
+		"tags": ["calendar", "google", "color", "denmark", "configurable"],
+		"author": {
+			"name": "BYOS",
+			"github": ""
+		},
+		"renderSettings": {
+			"doubleSizeForSharperText": true,
+			"applyEdgeSnap": false
+		},
+		"version": "0.1.0",
+		"category": "calendar"
+	},
 	"not-found": {
 		"title": "Not Found Recipe",
 		"published": true,

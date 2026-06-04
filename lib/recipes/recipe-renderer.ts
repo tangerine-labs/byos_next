@@ -188,11 +188,15 @@ export const fetchRecipeProps = cache(
 			const { default: fetchDataFunction } = (await import(
 				`@/app/(app)/recipes/screens/${slug}/getData.ts`
 			)) as {
-				default: (params?: Record<string, unknown>) => Promise<ComponentProps>;
+				default: (
+					params?: Record<string, unknown>,
+					userId?: string,
+				) => Promise<ComponentProps>;
 			};
 
-			// Set a timeout for data fetching to prevent hanging
-			const fetchPromise = fetchDataFunction(params);
+			// Set a timeout for data fetching to prevent hanging. userId lets
+			// recipes scope per-tenant data (e.g. OAuth tokens) under RLS.
+			const fetchPromise = fetchDataFunction(params, userId);
 			const timeoutPromise = new Promise((_, reject) => {
 				setTimeout(() => reject(new Error("Data fetch timeout")), 10000);
 			});

@@ -928,6 +928,67 @@ CREATE POLICY mixup_slots_delete_policy ON mixup_slots
 GRANT SELECT, INSERT, UPDATE, DELETE ON playlist_items TO byos_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON mixup_slots TO byos_app;`,
 	},
+	"0015_add_google_calendar": {
+		title: "Add Google Calendar Credentials",
+		description:
+			"Per-user Google OAuth credentials (encrypted refresh/access tokens) for the google-calendar recipe, with RLS scoped to the owning user",
+		sql: `-- =============================================================================
+-- Part 1: Create google_calendar_credentials table
+-- =============================================================================
+-- One row per user. Tokens are encrypted at rest (AES-256-GCM) by the app
+-- before insert; the database never sees plaintext tokens. The device render
+-- path reads this row (scoped via SET ROLE byos_app + app.current_user_id) to
+-- mint a fresh access token without any browser session present.
+
+CREATE TABLE IF NOT EXISTS google_calendar_credentials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL UNIQUE REFERENCES "user"("id") ON DELETE CASCADE,
+    refresh_token_enc TEXT NOT NULL,
+    access_token_enc TEXT,
+    access_token_expires_at TIMESTAMPTZ,
+    scope TEXT,
+    google_email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS "google_calendar_credentials_user_id_idx"
+    ON google_calendar_credentials ("user_id");
+
+-- =============================================================================
+-- Part 2: Row Level Security (per-user; no shared NULL rows)
+-- =============================================================================
+
+ALTER TABLE google_calendar_credentials ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS google_calendar_credentials_select_policy ON google_calendar_credentials;
+DROP POLICY IF EXISTS google_calendar_credentials_insert_policy ON google_calendar_credentials;
+DROP POLICY IF EXISTS google_calendar_credentials_update_policy ON google_calendar_credentials;
+DROP POLICY IF EXISTS google_calendar_credentials_delete_policy ON google_calendar_credentials;
+
+CREATE POLICY google_calendar_credentials_select_policy ON google_calendar_credentials
+    FOR SELECT
+    USING (user_id = current_setting('app.current_user_id', true));
+
+CREATE POLICY google_calendar_credentials_insert_policy ON google_calendar_credentials
+    FOR INSERT
+    WITH CHECK (user_id = current_setting('app.current_user_id', true));
+
+CREATE POLICY google_calendar_credentials_update_policy ON google_calendar_credentials
+    FOR UPDATE
+    USING (user_id = current_setting('app.current_user_id', true))
+    WITH CHECK (user_id = current_setting('app.current_user_id', true));
+
+CREATE POLICY google_calendar_credentials_delete_policy ON google_calendar_credentials
+    FOR DELETE
+    USING (user_id = current_setting('app.current_user_id', true));
+
+-- =============================================================================
+-- Part 3: Grant DML to the RLS app role (mirrors migration 0009)
+-- =============================================================================
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON google_calendar_credentials TO byos_app;`,
+	},
 	validate_schema: {
 		title: "Validate Database Schema",
 		description:
@@ -936,7 +997,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON mixup_slots TO byos_app;`,
 -- Returns empty result if all tables exist, or rows with missing table names if any are missing
 SELECT 
   expected_table as missing_table
-FROM unnest(ARRAY['account', 'devices', 'logs', 'mixup_slots', 'mixups', 'playlist_items', 'playlists', 'recipe_files', 'recipes', 'schema_migrations', 'screen_configs', 'session', 'system_logs', 'user', 'verification']::text[]) as expected_table
+FROM unnest(ARRAY['account', 'devices', 'google_calendar_credentials', 'logs', 'mixup_slots', 'mixups', 'playlist_items', 'playlists', 'recipe_files', 'recipes', 'schema_migrations', 'screen_configs', 'session', 'system_logs', 'user', 'verification']::text[]) as expected_table
 WHERE NOT EXISTS (
   SELECT 1 
   FROM information_schema.tables 

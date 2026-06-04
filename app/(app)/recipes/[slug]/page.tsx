@@ -4,6 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense, use } from "react";
+import {
+	disconnectGoogleCalendar,
+	type GoogleCalendarStatus,
+	getGoogleCalendarStatus,
+} from "@/app/actions/google-calendar";
 import { fetchRecipes } from "@/app/actions/mixup";
 import {
 	getScreenParams,
@@ -47,6 +52,92 @@ async function refreshData(slug: string) {
 	"use server";
 	await new Promise((resolve) => setTimeout(resolve, 500));
 	revalidateTag(slug, "max");
+}
+
+async function disconnectGoogle() {
+	"use server";
+	await disconnectGoogleCalendar();
+}
+
+const GOOGLE_RESULT_MESSAGES: Record<string, string> = {
+	connected: "Google Calendar connected.",
+	denied: "Connection cancelled — consent was not granted.",
+	state_mismatch: "Security check failed. Please try connecting again.",
+	not_signed_in: "You must be signed in to connect a calendar.",
+	no_refresh_token:
+		"Google didn't return a refresh token. Revoke prior access at myaccount.google.com/permissions and retry.",
+	not_configured:
+		"Google OAuth isn't configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_TOKEN_ENCRYPTION_KEY.",
+	error: "Something went wrong connecting to Google. Check the server logs.",
+};
+
+function GoogleCalendarIntegration({
+	status,
+	resultCode,
+}: {
+	status: GoogleCalendarStatus;
+	resultCode?: string;
+}) {
+	const message = resultCode ? GOOGLE_RESULT_MESSAGES[resultCode] : undefined;
+	return (
+		<SectionCard label="Google Calendar">
+			<div className="space-y-3 rounded-lg border p-4">
+				{message && (
+					<p
+						className={`text-sm ${resultCode === "connected" ? "text-green-600" : "text-amber-600"}`}
+					>
+						{message}
+					</p>
+				)}
+				{!status.configured ? (
+					<p className="text-sm text-muted-foreground">
+						Integration not configured. Add <code>GOOGLE_CLIENT_ID</code>,{" "}
+						<code>GOOGLE_CLIENT_SECRET</code> and{" "}
+						<code>GOOGLE_TOKEN_ENCRYPTION_KEY</code> to your environment, then
+						restart the server.
+					</p>
+				) : status.connected ? (
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="text-sm">
+							<span className="font-medium text-green-600">Connected</span>
+							{status.email && (
+								<span className="text-muted-foreground"> — {status.email}</span>
+							)}
+						</div>
+						<div className="flex gap-2">
+							<a
+								href="/api/integrations/google/start"
+								className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent"
+							>
+								Reconnect
+							</a>
+							<form action={disconnectGoogle}>
+								<button
+									type="submit"
+									className="inline-flex h-9 items-center rounded-md border border-destructive/40 px-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+								>
+									Disconnect
+								</button>
+							</form>
+						</div>
+					</div>
+				) : (
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<p className="text-sm text-muted-foreground">
+							Connect your Google account so the device render can read your
+							events.
+						</p>
+						<a
+							href="/api/integrations/google/start"
+							className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+						>
+							Connect Google Calendar
+						</a>
+					</div>
+				)}
+			</div>
+		</SectionCard>
+	);
 }
 
 export async function generateStaticParams() {
@@ -416,12 +507,14 @@ export default async function RecipePage({
 	searchParams,
 }: {
 	params: Promise<{ slug: string }>;
-	searchParams: Promise<{ format?: string }>;
+	searchParams: Promise<{ format?: string; google?: string }>;
 }) {
 	headers();
 	const { slug } = await params;
-	const { format } = await searchParams;
+	const { format, google: googleResult } = await searchParams;
 	const config = await fetchRecipeConfig(slug);
+	const googleStatus =
+		slug === "google-calendar" ? await getGoogleCalendarStatus() : null;
 	const isPortrait = format === "portrait";
 	const imageWidth = isPortrait ? DEFAULT_IMAGE_HEIGHT : DEFAULT_IMAGE_WIDTH;
 	const imageHeight = isPortrait ? DEFAULT_IMAGE_WIDTH : DEFAULT_IMAGE_HEIGHT;
@@ -637,6 +730,13 @@ export default async function RecipePage({
 						</span>
 					}
 				/>
+
+				{googleStatus && (
+					<GoogleCalendarIntegration
+						status={googleStatus}
+						resultCode={googleResult}
+					/>
+				)}
 
 				{config.params && Object.keys(config.params).length > 0 && (
 					<ScreenParamsForm

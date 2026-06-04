@@ -1,5 +1,5 @@
-import Holidays from "date-holidays";
 import type { HolidaysTypes } from "date-holidays";
+import Holidays from "date-holidays";
 
 export type HolidayCountry = "DK";
 

@@ -1,5 +1,5 @@
-import { connection } from "next/server";
 import { sql } from "kysely";
+import { connection } from "next/server";
 import { db } from "./db";
 import { SQL_STATEMENTS } from "./sql-statements";
 

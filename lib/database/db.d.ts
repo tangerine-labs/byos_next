@@ -116,6 +116,18 @@ export interface Devices {
 	user_id: string | null;
 }
 
+export interface GoogleCalendarCredentials {
+	access_token_enc: string | null;
+	access_token_expires_at: Timestamp | null;
+	created_at: Generated<Timestamp | null>;
+	google_email: string | null;
+	id: Generated<string>;
+	refresh_token_enc: string;
+	scope: string | null;
+	updated_at: Generated<Timestamp | null>;
+	user_id: string;
+}
+
 export interface Logs {
 	created_at: Generated<Timestamp | null>;
 	friendly_id: string | null;
@@ -179,7 +191,7 @@ export interface Recipes {
 	description: string | null;
 	id: Generated<string>;
 	logo_url: string | null;
-	metadata: Generated<JsonObject | null>;
+	metadata: Generated<Json | null>;
 	name: string;
 	repo: string | null;
 	screenshot_url: string | null;
@@ -190,6 +202,12 @@ export interface Recipes {
 	version: string | null;
 	zip_entry_path: string | null;
 	zip_url: string | null;
+}
+
+export interface SchemaMigrations {
+	applied_at: Generated<Timestamp>;
+	checksum: string;
+	name: string;
 }
 
 export interface ScreenConfigs {
@@ -252,6 +270,7 @@ export interface Verification {
 export interface DB {
 	account: Account;
 	devices: Devices;
+	google_calendar_credentials: GoogleCalendarCredentials;
 	logs: Logs;
 	mixup_slots: MixupSlots;
 	mixups: Mixups;
@@ -259,6 +278,7 @@ export interface DB {
 	playlists: Playlists;
 	recipe_files: RecipeFiles;
 	recipes: Recipes;
+	schema_migrations: SchemaMigrations;
 	screen_configs: ScreenConfigs;
 	session: Session;
 	system_logs: SystemLogs;
