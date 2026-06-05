@@ -252,6 +252,12 @@ export default function GoogleCalendar({
 										width: miniCell,
 										height: miniCell,
 										backgroundColor: cellColor(cell),
+										// Outline in-month days so white/normal cells are visible
+										// and the grid reads as a full month; out-of-month stays blank.
+										border: cell.inMonth
+											? `${px(1)}px solid ${display6.black}`
+											: undefined,
+										boxSizing: "border-box",
 									}}
 								/>
 							))}
