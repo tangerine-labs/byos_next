@@ -44,6 +44,7 @@ const nextConfig: NextConfig = {
 			{ protocol: "https", hostname: "usetrmnl.com" },
 			{ protocol: "https", hostname: "trmnl.s3.us-east-2.amazonaws.com" },
 			{ protocol: "https", hostname: "trmnl-public.s3.us-east-2.amazonaws.com" },
+			{ protocol: "https", hostname: "forgejo.sny.sh" },
 		],
 	},
 };

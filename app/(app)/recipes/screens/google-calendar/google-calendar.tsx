@@ -6,7 +6,7 @@ import type {
 	MonthCell,
 	WeekDay,
 } from "./getData";
-import { CHESS_RASTER_URL, display6 } from "./tokens";
+import { display6, display6Soft } from "./tokens";
 
 type Props = Partial<GoogleCalendarData> & {
 	width?: number;
@@ -33,7 +33,9 @@ function cellColor(cell: MonthCell): string {
 	if (!cell.inMonth) return display6.white;
 	if (cell.isToday) return display6.black;
 	if (cell.isHoliday) return display6.red;
-	if (cell.isVacation || cell.isWeekend) return display6.green;
+	// 50% green over white → server dither renders weekends as a half green /
+	// half white dithered pattern rather than a solid green block.
+	if (cell.isVacation || cell.isWeekend) return display6Soft.green;
 	return display6.white;
 }
 
@@ -246,8 +248,8 @@ export default function GoogleCalendar({
 			);
 		}
 
-		// Filled variant (current month): chess raster on plain days, solid
-		// fills on special days, a solid outline on every in-month day.
+		// Filled variant (current month): solid fills on special days; plain
+		// weekdays get only a black outline (no red/green fill of their own).
 		const isPlain =
 			cell.inMonth &&
 			!cell.isToday &&
@@ -261,17 +263,10 @@ export default function GoogleCalendar({
 					width: miniCell,
 					height: miniCell,
 					backgroundColor: cellColor(cell),
-					...(isPlain
-						? {
-								backgroundImage: `url(${CHESS_RASTER_URL})`,
-								backgroundSize: `${px(8)}px ${px(8)}px`,
-								imageRendering: "pixelated" as const,
-							}
-						: {}),
-					// Outline in-month days so the grid reads as a full month;
-					// out-of-month stays blank.
-					border: cell.inMonth
-						? `${px(1)}px solid ${display6.black}`
+					// Outline only plain weekdays. Floor at 1 real pixel so the
+					// border survives down-scaling (px(1) rounds to 0 at <1.5×).
+					border: isPlain
+						? `${Math.max(1, px(1))}px solid ${display6.black}`
 						: undefined,
 					boxSizing: "border-box",
 				}}
