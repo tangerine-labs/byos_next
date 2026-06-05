@@ -60,6 +60,10 @@ export type GoogleCalendarData = {
 	monthCells: MonthCell[];
 	/** ISO week number for each of the 6 month-grid rows. */
 	monthWeeks: number[];
+	/** Next month, rendered in full with a dotted (outline-only) style. */
+	nextMonthTitle: string;
+	nextMonthCells: MonthCell[];
+	nextMonthWeeks: number[];
 	weekDays: WeekDay[];
 	weekNumber: number;
 	showWeekNumbers: boolean;
@@ -282,6 +286,10 @@ export default async function getData(
 	const monthGridStart = mondayOf(firstOfMonth);
 	const monthGridEndExcl = monthGridStart.add({ days: 42 });
 
+	// Next month, rendered in full below the current month (dotted style).
+	const nextMonthFirst = firstOfMonth.add({ months: 1 });
+	const nextMonthGridStart = mondayOf(nextMonthFirst);
+
 	// Detail week: current Monday..Sunday.
 	const weekStart = mondayOf(today);
 	const weekEndExcl = weekStart.add({ days: 7 });
@@ -301,7 +309,8 @@ export default async function getData(
 	// Only DK is supported today; the `country` param is reserved for future use.
 	const holidayDates = new Set<string>();
 	const supportedCountry: HolidayCountry = "DK";
-	for (let y = rangeStart.year; y <= rangeEndExcl.year; y++) {
+	const holidayEndYear = nextMonthGridStart.add({ days: 41 }).year;
+	for (let y = rangeStart.year; y <= holidayEndYear; y++) {
 		for (const d of getHolidayDates(supportedCountry, y)) holidayDates.add(d);
 	}
 
@@ -363,6 +372,23 @@ export default async function getData(
 		(_, row) => monthGridStart.add({ days: row * 7 }).weekOfYear ?? 0,
 	);
 
+	// Next month cells/weeks (holiday + weekend flags only; no events/vacation).
+	const nextMonthCells: MonthCell[] = [];
+	for (let i = 0; i < 42; i++) {
+		const d = nextMonthGridStart.add({ days: i });
+		nextMonthCells.push({
+			day: d.day,
+			inMonth:
+				d.year === nextMonthFirst.year && d.month === nextMonthFirst.month,
+			...flagsFor(d),
+		});
+	}
+	const nextMonthWeeks = Array.from(
+		{ length: 6 },
+		(_, row) => nextMonthGridStart.add({ days: row * 7 }).weekOfYear ?? 0,
+	);
+	const nextMonthTitle = monthYearFormat.format(labelDate(nextMonthFirst));
+
 	// Group events onto week days.
 	const eventsByDate = new Map<string, CalendarEvent[]>();
 	for (const ev of payload.events) {
@@ -402,6 +428,9 @@ export default async function getData(
 		weekdayInitials: WEEKDAY_INITIALS,
 		monthCells,
 		monthWeeks,
+		nextMonthTitle,
+		nextMonthCells,
+		nextMonthWeeks,
 		weekDays,
 		weekNumber: today.weekOfYear ?? 0,
 		showWeekNumbers,

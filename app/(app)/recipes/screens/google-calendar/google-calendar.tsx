@@ -53,6 +53,9 @@ export default function GoogleCalendar({
 	weekdayInitials = [],
 	monthCells = [],
 	monthWeeks = [],
+	nextMonthTitle = "",
+	nextMonthCells = [],
+	nextMonthWeeks = [],
 	weekDays = [],
 	weekNumber = 0,
 	showWeekNumbers = true,
@@ -203,9 +206,38 @@ export default function GoogleCalendar({
 		</section>
 	);
 
-	const renderMonthCell = (cell: MonthCell, key: string) => {
-		// "Plain" = an in-month day with no special colour; it gets the chess
-		// raster so it reads as a textured cell rather than blank.
+	const renderMonthCell = (
+		cell: MonthCell,
+		key: string,
+		variant: "filled" | "dotted" = "filled",
+	) => {
+		// Dotted variant (next month): outline-only, colour = day type.
+		if (variant === "dotted") {
+			const base = {
+				width: miniCell,
+				height: miniCell,
+				boxSizing: "border-box" as const,
+			};
+			if (!cell.inMonth) return <div key={key} style={base} />;
+			if (cell.isToday)
+				return (
+					<div key={key} style={{ ...base, backgroundColor: display6.black }} />
+				);
+			const dotColor = cell.isHoliday
+				? display6.red
+				: cell.isVacation || cell.isWeekend
+					? display6.green
+					: display6.black;
+			return (
+				<div
+					key={key}
+					style={{ ...base, border: `${px(2)}px dotted ${dotColor}` }}
+				/>
+			);
+		}
+
+		// Filled variant (current month): chess raster on plain days, solid
+		// fills on special days, a solid outline on every in-month day.
 		const isPlain =
 			cell.inMonth &&
 			!cell.isToday &&
@@ -236,6 +268,53 @@ export default function GoogleCalendar({
 			/>
 		);
 	};
+
+	// Build a whole month grid: day-initial header row + week-number gutter.
+	const renderMonthGrid = (
+		cells: MonthCell[],
+		weeks: number[],
+		variant: "filled" | "dotted",
+	) => (
+		<div
+			className="grid shrink-0"
+			style={{
+				gridTemplateColumns: `${weekNumW}px repeat(7, ${miniCell}px)`,
+				gridTemplateRows: `${initialH}px repeat(6, ${miniCell}px)`,
+				gap: monthGap,
+			}}
+		>
+			<div />
+			{weekdayInitials.map((init, i) => (
+				<div
+					key={`init-${variant}-${i}-${init}`}
+					className="flex items-end justify-center font-inter font-bold"
+					style={{ fontSize: initialSize, color: display6.black }}
+				>
+					{init}
+				</div>
+			))}
+			{weeks.flatMap((wk, row) => {
+				const rowCells = cells.slice(row * 7, row * 7 + 7);
+				const hasInMonth = rowCells.some((c) => c.inMonth);
+				return [
+					<div
+						key={`wk-${variant}-${row}`}
+						className="flex items-center justify-end font-inter"
+						style={{
+							fontSize: weekNumSize,
+							color: display6.black,
+							paddingRight: px(5),
+						}}
+					>
+						{hasInMonth ? wk : ""}
+					</div>,
+					...rowCells.map((cell, i) =>
+						renderMonthCell(cell, `c-${variant}-${row}-${i}`, variant),
+					),
+				];
+			})}
+		</div>
+	);
 
 	return (
 		<PreSatori useDoubling width={width} height={height}>
@@ -290,47 +369,24 @@ export default function GoogleCalendar({
 							paddingTop: weekHeaderH - initialH - monthGap,
 						}}
 					>
-						<div
-							className="grid shrink-0"
-							style={{
-								gridTemplateColumns: `${weekNumW}px repeat(7, ${miniCell}px)`,
-								gridTemplateRows: `${initialH}px repeat(6, ${miniCell}px)`,
-								gap: monthGap,
-							}}
-						>
-							{/* corner */}
-							<div />
-							{/* day initials */}
-							{weekdayInitials.map((init, i) => (
-								<div
-									key={`init-${i}-${init}`}
-									className="flex items-end justify-center font-inter font-bold"
-									style={{ fontSize: initialSize, color: display6.black }}
-								>
-									{init}
-								</div>
-							))}
-							{/* week number + that row's 7 day cells */}
-							{monthWeeks.flatMap((wk, row) => {
-								const rowCells = monthCells.slice(row * 7, row * 7 + 7);
-								const hasInMonth = rowCells.some((c) => c.inMonth);
-								return [
-									<div
-										key={`wk-${row}`}
-										className="flex items-center justify-end font-inter"
-										style={{
-											fontSize: weekNumSize,
-											color: display6.black,
-											paddingRight: px(5),
-										}}
-									>
-										{hasInMonth ? wk : ""}
-									</div>,
-									...rowCells.map((cell, i) =>
-										renderMonthCell(cell, `c-${row}-${i}`),
-									),
-								];
-							})}
+						{/* Current month — filled / chess-raster style */}
+						{renderMonthGrid(monthCells, monthWeeks, "filled")}
+
+						{/* Next month — rendered in full, dotted outline style */}
+						<div style={{ marginTop: px(24) }}>
+							<span
+								className="font-inter font-bold leading-none"
+								style={{
+									fontSize: px(22),
+									color: display6.black,
+									textTransform: "capitalize",
+									display: "block",
+									marginBottom: px(8),
+								}}
+							>
+								{nextMonthTitle}
+							</span>
+							{renderMonthGrid(nextMonthCells, nextMonthWeeks, "dotted")}
 						</div>
 
 						{/* Legend: calendar → accent colour */}
