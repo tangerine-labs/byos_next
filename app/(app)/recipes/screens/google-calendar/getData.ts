@@ -55,7 +55,11 @@ export type GoogleCalendarData = {
 	configured: boolean;
 	monthTitle: string;
 	weekdayLabels: string[];
+	/** Single-letter weekday initials, Monday-first (M T O T F L S). */
+	weekdayInitials: string[];
 	monthCells: MonthCell[];
+	/** ISO week number for each of the 6 month-grid rows. */
+	monthWeeks: number[];
 	weekDays: WeekDay[];
 	weekNumber: number;
 	showWeekNumbers: boolean;
@@ -85,6 +89,9 @@ function labelDate(d: Temporal.PlainDate): Date {
 const MONDAY_REF = Temporal.PlainDate.from({ year: 2024, month: 1, day: 1 });
 const WEEKDAY_LABELS = Array.from({ length: 7 }, (_, i) =>
 	weekdayShortFormat.format(labelDate(MONDAY_REF.add({ days: i }))),
+);
+const WEEKDAY_INITIALS = WEEKDAY_LABELS.map((label) =>
+	label.charAt(0).toUpperCase(),
 );
 
 function timeLabel(zdt: Temporal.ZonedDateTime): string {
@@ -327,6 +334,12 @@ export default async function getData(
 		});
 	}
 
+	// ISO week number for each of the 6 grid rows (the row's Monday).
+	const monthWeeks = Array.from(
+		{ length: 6 },
+		(_, row) => monthGridStart.add({ days: row * 7 }).weekOfYear ?? 0,
+	);
+
 	// Group events onto week days.
 	const eventsByDate = new Map<string, CalendarEvent[]>();
 	for (const ev of payload.events) {
@@ -363,7 +376,9 @@ export default async function getData(
 		configured,
 		monthTitle,
 		weekdayLabels: WEEKDAY_LABELS,
+		weekdayInitials: WEEKDAY_INITIALS,
 		monthCells,
+		monthWeeks,
 		weekDays,
 		weekNumber: today.weekOfYear ?? 0,
 		showWeekNumbers,

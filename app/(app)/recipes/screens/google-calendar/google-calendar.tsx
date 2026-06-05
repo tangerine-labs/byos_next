@@ -50,7 +50,9 @@ export default function GoogleCalendar({
 	connected = false,
 	configured = false,
 	monthTitle = "",
+	weekdayInitials = [],
 	monthCells = [],
+	monthWeeks = [],
 	weekDays = [],
 	weekNumber = 0,
 	showWeekNumbers = true,
@@ -64,11 +66,15 @@ export default function GoogleCalendar({
 	const headerH = px(96);
 	const gap = px(28);
 
-	// Pixel-perfect colour-only month grid: 5×5px cells with a 1px gap, sized
-	// with explicit px tracks (not fr) so every day is exactly square.
+	// Pixel-perfect colour-only month grid: square cells on explicit px tracks
+	// (not fr). A left gutter holds week numbers; a top row holds day initials.
 	const miniCell = px(24);
 	const monthGap = px(2);
-	const monthColW = miniCell * 7 + monthGap * 6;
+	const weekNumW = px(30);
+	const initialH = px(20);
+	const initialSize = px(16);
+	const weekNumSize = px(15);
+	const monthColW = weekNumW + miniCell * 7 + monthGap * 7;
 
 	const titleSize = px(56);
 	const subSize = px(26);
@@ -196,6 +202,40 @@ export default function GoogleCalendar({
 		</section>
 	);
 
+	const renderMonthCell = (cell: MonthCell, key: string) => {
+		// "Plain" = an in-month day with no special colour; it gets the chess
+		// raster so it reads as a textured cell rather than blank.
+		const isPlain =
+			cell.inMonth &&
+			!cell.isToday &&
+			!cell.isHoliday &&
+			!cell.isVacation &&
+			!cell.isWeekend;
+		return (
+			<div
+				key={key}
+				style={{
+					width: miniCell,
+					height: miniCell,
+					backgroundColor: cellColor(cell),
+					...(isPlain
+						? {
+								backgroundImage: `url(${CHESS_RASTER_URL})`,
+								backgroundSize: `${px(8)}px ${px(8)}px`,
+								imageRendering: "pixelated" as const,
+							}
+						: {}),
+					// Outline in-month days so the grid reads as a full month;
+					// out-of-month stays blank.
+					border: cell.inMonth
+						? `${px(1)}px solid ${display6.black}`
+						: undefined,
+					boxSizing: "border-box",
+				}}
+			/>
+		);
+	};
+
 	return (
 		<PreSatori useDoubling width={width} height={height}>
 			<div
@@ -239,51 +279,56 @@ export default function GoogleCalendar({
 						minHeight: 0,
 					}}
 				>
-					{/* Month overview — pixel-perfect colour-only micro-grid */}
+					{/* Month overview — colour grid with a day-initial row and a
+					    week-number gutter. paddingTop keeps the day cells (not the
+					    initial row) aligned with the week-view events. */}
 					<section
 						className="flex flex-col"
-						style={{ minHeight: 0, paddingTop: weekHeaderH }}
+						style={{
+							minHeight: 0,
+							paddingTop: weekHeaderH - initialH - monthGap,
+						}}
 					>
 						<div
 							className="grid shrink-0"
 							style={{
-								gridTemplateColumns: `repeat(7, ${miniCell}px)`,
-								gridTemplateRows: `repeat(6, ${miniCell}px)`,
+								gridTemplateColumns: `${weekNumW}px repeat(7, ${miniCell}px)`,
+								gridTemplateRows: `${initialH}px repeat(6, ${miniCell}px)`,
 								gap: monthGap,
 							}}
 						>
-							{monthCells.map((cell, i) => {
-								// "Plain" = an in-month day with no special colour; it gets the
-								// chess raster so it reads as a textured cell rather than blank.
-								const isPlain =
-									cell.inMonth &&
-									!cell.isToday &&
-									!cell.isHoliday &&
-									!cell.isVacation &&
-									!cell.isWeekend;
-								return (
+							{/* corner */}
+							<div />
+							{/* day initials */}
+							{weekdayInitials.map((init, i) => (
+								<div
+									key={`init-${i}-${init}`}
+									className="flex items-end justify-center font-inter font-bold"
+									style={{ fontSize: initialSize, color: display6.black }}
+								>
+									{init}
+								</div>
+							))}
+							{/* week number + that row's 7 day cells */}
+							{monthWeeks.flatMap((wk, row) => {
+								const rowCells = monthCells.slice(row * 7, row * 7 + 7);
+								const hasInMonth = rowCells.some((c) => c.inMonth);
+								return [
 									<div
-										key={`${cell.day}-${i}`}
+										key={`wk-${row}`}
+										className="flex items-center justify-end font-inter"
 										style={{
-											width: miniCell,
-											height: miniCell,
-											backgroundColor: cellColor(cell),
-											...(isPlain
-												? {
-														backgroundImage: `url(${CHESS_RASTER_URL})`,
-														backgroundSize: `${px(8)}px ${px(8)}px`,
-														imageRendering: "pixelated" as const,
-													}
-												: {}),
-											// Outline in-month days so the grid reads as a full month;
-											// out-of-month stays blank.
-											border: cell.inMonth
-												? `${px(1)}px solid ${display6.black}`
-												: undefined,
-											boxSizing: "border-box",
+											fontSize: weekNumSize,
+											color: display6.black,
+											paddingRight: px(5),
 										}}
-									/>
-								);
+									>
+										{hasInMonth ? wk : ""}
+									</div>,
+									...rowCells.map((cell, i) =>
+										renderMonthCell(cell, `c-${row}-${i}`),
+									),
+								];
 							})}
 						</div>
 					</section>
