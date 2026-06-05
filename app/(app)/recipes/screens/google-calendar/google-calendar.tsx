@@ -77,6 +77,10 @@ export default function GoogleCalendar({
 	const eventTime = px(20);
 	const eventTitle = px(22);
 
+	// Height of a week-view day header (weekday + number + underline + spacing),
+	// used to drop the month grid down so it lines up with the events below.
+	const weekHeaderH = dayHeadSize + dayNumSize + px(4) + px(2) + px(8);
+
 	// NOTE: these are plain functions called inline (not <Components/>) so that
 	// PreSatori traverses the elements they return and applies the font-* family.
 	// Custom component boundaries are opaque to PreSatori's tree walk.
@@ -236,7 +240,10 @@ export default function GoogleCalendar({
 					}}
 				>
 					{/* Month overview — pixel-perfect colour-only micro-grid */}
-					<section className="flex flex-col" style={{ minHeight: 0 }}>
+					<section
+						className="flex flex-col"
+						style={{ minHeight: 0, paddingTop: weekHeaderH }}
+					>
 						<div
 							className="grid shrink-0"
 							style={{
