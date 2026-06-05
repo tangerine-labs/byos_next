@@ -11,7 +11,7 @@ import {
 	getHolidayDates,
 	type HolidayCountry,
 } from "../color-calendar/holidays";
-import { accentForIndex } from "./tokens";
+import { accentForIndex, display6 } from "./tokens";
 
 // Mark dynamic so the renderer always re-evaluates "now" (caching of the actual
 // Google network calls is handled explicitly via unstable_cache below).
@@ -19,6 +19,10 @@ export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Copenhagen";
 const LOCALE = "da-DK";
+
+// Calendars whose name matches this are always drawn red (and skip the colour
+// cycle), e.g. "Holidays in Denmark", "Helgdagar i Sverige".
+const HOLIDAY_CALENDAR_RE = /holidays|helgdag/i;
 
 // ---- Serializable props (no Temporal/Date objects cross the render boundary) ----
 
@@ -197,11 +201,18 @@ function buildCalendarPayloadFetcher() {
 				),
 			);
 
-			// Only calendars with events get an accent, cycled in their order so
-			// the legend reads as a clean black → blue → yellow → green sequence.
+			// Only calendars with events get an accent. Holiday calendars are
+			// always red and don't consume a cycle slot; the rest cycle through
+			// the palette in order (black → blue → yellow → green).
+			let cycleIdx = 0;
 			const active = perCalendar
 				.filter((g) => g.events.length > 0)
-				.map((g, i) => ({ ...g, color: accentForIndex(i) }));
+				.map((g) => ({
+					...g,
+					color: HOLIDAY_CALENDAR_RE.test(g.name)
+						? display6.red
+						: accentForIndex(cycleIdx++),
+				}));
 
 			const out: NormalizedEvent[] = [];
 			const vacationDates = new Set<string>();
