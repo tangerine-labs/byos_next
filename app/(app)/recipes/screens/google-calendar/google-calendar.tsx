@@ -66,8 +66,8 @@ export default function GoogleCalendar({
 
 	// Pixel-perfect colour-only month grid: 5×5px cells with a 1px gap, sized
 	// with explicit px tracks (not fr) so every day is exactly square.
-	const miniCell = px(32);
-	const monthGap = px(1);
+	const miniCell = px(24);
+	const monthGap = px(2);
 	const monthColW = miniCell * 7 + monthGap * 6;
 
 	const titleSize = px(56);
