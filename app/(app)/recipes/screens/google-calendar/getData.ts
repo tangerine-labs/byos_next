@@ -24,6 +24,104 @@ const LOCALE = "da-DK";
 // cycle), e.g. "Holidays in Denmark", "Helgdagar i Sverige".
 const HOLIDAY_CALENDAR_RE = /holidays|helgdag/i;
 
+const NAMED_COLORS: Record<string, string> = {
+	black: display6.black,
+	white: display6.white,
+	red: display6.red,
+	green: display6.green,
+	blue: display6.blue,
+	yellow: display6.yellow,
+};
+
+type ColorRule = { match: string; color: string };
+
+/** Parse the calendarColors JSON param into name-substring → colour rules. */
+function parseCalendarColors(json: string): ColorRule[] {
+	try {
+		const obj = JSON.parse(json) as Record<string, string>;
+		return Object.entries(obj)
+			.map(([match, value]) => {
+				const v = String(value).trim();
+				const color = v.startsWith("#") ? v : NAMED_COLORS[v.toLowerCase()];
+				return color ? { match: match.toLowerCase(), color } : null;
+			})
+			.filter((x): x is ColorRule => x !== null);
+	} catch {
+		return [];
+	}
+}
+
+/** Holiday → always red; else a configured colour; else the next cycle colour. */
+function resolveCalendarColor(
+	name: string,
+	rules: ColorRule[],
+	nextCycle: () => string,
+): string {
+	if (HOLIDAY_CALENDAR_RE.test(name)) return display6.red;
+	const lower = name.toLowerCase();
+	for (const rule of rules) {
+		if (rule.match && lower.includes(rule.match)) return rule.color;
+	}
+	return nextCycle();
+}
+
+/**
+ * Per-day event processing:
+ *  1. Merge overlapping events (same title + start across calendars) into a
+ *     single entry whose `colors` carry up to two of the calendars' colours
+ *     (rendered as a striped pattern; a 3rd overlapping colour is dropped).
+ *  2. Collapse holiday (solid-red) all-day events into one merged entry.
+ *  3. Sort all-day-first, then by start time.
+ */
+function processDayEvents(events: CalendarEvent[]): CalendarEvent[] {
+	const groups = new Map<string, CalendarEvent[]>();
+	for (const e of events) {
+		const key = `${e.allDay ? "d" : "t"}|${e.startEpoch}|${e.title.trim().toLowerCase()}`;
+		const g = groups.get(key);
+		if (g) g.push(e);
+		else groups.set(key, [e]);
+	}
+
+	let merged: CalendarEvent[] = [];
+	for (const group of groups.values()) {
+		if (group.length === 1) {
+			merged.push(group[0]);
+			continue;
+		}
+		const colors = [...new Set(group.flatMap((g) => g.colors))].slice(0, 2);
+		merged.push({ ...group[0], colors });
+	}
+
+	const isHoliday = (e: CalendarEvent) =>
+		e.allDay && e.colors.length === 1 && e.colors[0] === display6.red;
+	const holidays = merged.filter(isHoliday);
+	if (holidays.length > 1) {
+		const seen = new Set<string>();
+		const titles: string[] = [];
+		for (const h of holidays) {
+			const norm = h.title.trim().toLowerCase();
+			if (!seen.has(norm)) {
+				seen.add(norm);
+				titles.push(h.title.trim());
+			}
+		}
+		merged = [
+			{
+				title: titles.join(" · "),
+				allDay: true,
+				startLabel: "",
+				startEpoch: 0,
+				colors: [display6.red],
+			},
+			...merged.filter((e) => !isHoliday(e)),
+		];
+	}
+
+	return merged.sort((a, b) =>
+		a.allDay !== b.allDay ? (a.allDay ? -1 : 1) : a.startEpoch - b.startEpoch,
+	);
+}
+
 // ---- Serializable props (no Temporal/Date objects cross the render boundary) ----
 
 export type CalendarEvent = {
@@ -31,7 +129,8 @@ export type CalendarEvent = {
 	allDay: boolean;
 	startLabel: string; // "" for all-day events
 	startEpoch: number; // sort key (0 for all-day so they lead the day)
-	color: string;
+	/** Marker colours: 1 = solid; 2 = striped pattern (overlapping calendars). */
+	colors: string[];
 };
 
 export type MonthCell = {
@@ -79,6 +178,8 @@ type GoogleCalendarParams = {
 	vacationCalendar?: string;
 	country?: string;
 	showWeekNumbers?: boolean | string;
+	/** JSON mapping a calendar name-substring to a colour. */
+	calendarColors?: string;
 };
 
 // ---- Intl formatters (Danish). Intl needs a Date, so build a UTC-neutral one. ----
@@ -168,6 +269,7 @@ function buildCalendarPayloadFetcher() {
 		async (args: {
 			userId: string;
 			vacationCalendar: string;
+			calendarColorsJson: string;
 			timeMinISO: string;
 			timeMaxISO: string;
 			rangeStartStr: string;
@@ -202,16 +304,17 @@ function buildCalendarPayloadFetcher() {
 			);
 
 			// Only calendars with events get an accent. Holiday calendars are
-			// always red and don't consume a cycle slot; the rest cycle through
-			// the palette in order (black → blue → yellow → green).
+			// always red; JSON-configured calendars get their colour; neither
+			// consumes a cycle slot. The rest cycle (black → blue → yellow → green).
+			const colorRules = parseCalendarColors(args.calendarColorsJson);
 			let cycleIdx = 0;
 			const active = perCalendar
 				.filter((g) => g.events.length > 0)
 				.map((g) => ({
 					...g,
-					color: HOLIDAY_CALENDAR_RE.test(g.name)
-						? display6.red
-						: accentForIndex(cycleIdx++),
+					color: resolveCalendarColor(g.name, colorRules, () =>
+						accentForIndex(cycleIdx++),
+					),
 				}));
 
 			const out: NormalizedEvent[] = [];
@@ -236,7 +339,7 @@ function buildCalendarPayloadFetcher() {
 								allDay: true,
 								startLabel: "",
 								startEpoch: 0,
-								color: group.color,
+								colors: [group.color],
 							});
 						}
 					} else if (ev.start.dateTime) {
@@ -249,7 +352,7 @@ function buildCalendarPayloadFetcher() {
 							allDay: false,
 							startLabel: timeLabel(zdt),
 							startEpoch: inst.epochMilliseconds,
-							color: group.color,
+							colors: [group.color],
 						});
 					}
 				}
@@ -343,6 +446,10 @@ export default async function getData(
 			payload = await getCachedCalendarPayload({
 				userId,
 				vacationCalendar,
+				calendarColorsJson:
+					typeof params?.calendarColors === "string"
+						? params.calendarColors
+						: "{}",
 				timeMinISO: dayStartInstantISO(rangeStart),
 				timeMaxISO: dayStartInstantISO(rangeEndExcl),
 				rangeStartStr: rangeStart.toString(),
@@ -409,7 +516,7 @@ export default async function getData(
 			allDay: ev.allDay,
 			startLabel: ev.startLabel,
 			startEpoch: ev.startEpoch,
-			color: ev.color,
+			colors: ev.colors,
 		});
 		eventsByDate.set(ev.dateStr, list);
 	}
@@ -418,10 +525,7 @@ export default async function getData(
 	for (let i = 0; i < 7; i++) {
 		const d = weekStart.add({ days: i });
 		const dateStr = d.toString();
-		const events = (eventsByDate.get(dateStr) ?? []).sort((a, b) => {
-			if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-			return a.startEpoch - b.startEpoch;
-		});
+		const events = processDayEvents(eventsByDate.get(dateStr) ?? []);
 		weekDays.push({
 			dateStr,
 			weekdayLabel: WEEKDAY_LABELS[i],

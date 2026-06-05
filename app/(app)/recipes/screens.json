@@ -243,6 +243,13 @@
 				"label": "Show ISO week number",
 				"description": "Display the ISO week number in the week-view header.",
 				"default": "true"
+			},
+			"calendarColors": {
+				"type": "string",
+				"label": "Calendar colours (JSON)",
+				"description": "JSON mapping a calendar name (case-insensitive substring) to a colour: black, blue, yellow, green, red, white (or a #hex). Holiday calendars are always red. Example: {\"Work\":\"blue\"}.",
+				"default": "{\"björn\":\"green\",\"bebop\":\"green\"}",
+				"placeholder": "{\"Work\":\"blue\"}"
 			}
 		},
 		"tags": ["calendar", "google", "color", "denmark", "configurable"],

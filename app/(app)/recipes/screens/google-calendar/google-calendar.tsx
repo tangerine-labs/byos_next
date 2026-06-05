@@ -95,37 +95,47 @@ export default function GoogleCalendar({
 	// PreSatori traverses the elements they return and applies the font-* family.
 	// Custom component boundaries are opaque to PreSatori's tree walk.
 
-	const renderEvent = (ev: CalendarEvent, key: string) => (
-		<div
-			key={key}
-			className="flex flex-col"
-			style={{
-				borderLeft: `${px(5)}px solid ${ev.color}`,
-				paddingLeft: px(6),
-			}}
-		>
-			<span
-				className="font-inter font-bold leading-none"
-				style={{ fontSize: eventTime, color: display6.black }}
-			>
-				{ev.allDay ? "hele dagen" : ev.startLabel}
-			</span>
-			<span
-				className="font-inter leading-tight"
-				style={{
-					fontSize: eventTitle,
-					color: display6.black,
-					marginTop: px(2),
-					display: "-webkit-box",
-					WebkitLineClamp: 3,
-					WebkitBoxOrient: "vertical" as const,
-					overflow: "hidden",
-				}}
-			>
-				{ev.title}
-			</span>
-		</div>
-	);
+	const renderEvent = (ev: CalendarEvent, key: string) => {
+		// One colour → solid bar; two (overlapping calendars) → striped pattern.
+		const barBackground =
+			ev.colors.length >= 2
+				? `repeating-linear-gradient(to bottom, ${ev.colors[0]} 0 ${px(5)}px, ${ev.colors[1]} ${px(5)}px ${px(10)}px)`
+				: (ev.colors[0] ?? display6.black);
+		return (
+			<div key={key} className="flex" style={{ gap: px(6) }}>
+				<div
+					style={{
+						width: px(5),
+						flexShrink: 0,
+						alignSelf: "stretch",
+						background: barBackground,
+					}}
+				/>
+				<div className="flex flex-col">
+					<span
+						className="font-inter font-bold leading-none"
+						style={{ fontSize: eventTime, color: display6.black }}
+					>
+						{ev.allDay ? "hele dagen" : ev.startLabel}
+					</span>
+					<span
+						className="font-inter leading-tight"
+						style={{
+							fontSize: eventTitle,
+							color: display6.black,
+							marginTop: px(2),
+							display: "-webkit-box",
+							WebkitLineClamp: 3,
+							WebkitBoxOrient: "vertical" as const,
+							overflow: "hidden",
+						}}
+					>
+						{ev.title}
+					</span>
+				</div>
+			</div>
+		);
+	};
 
 	const renderDay = (day: WeekDay) => {
 		const accent = headerColor(day);
@@ -343,7 +353,7 @@ export default function GoogleCalendar({
 					</h1>
 					<span
 						className="font-inter"
-						style={{ fontSize: subSize, color: display6.blue }}
+						style={{ fontSize: subSize, color: display6.black }}
 					>
 						{showWeekNumbers ? `Uge ${weekNumber} · ` : ""}Google Kalender
 					</span>
