@@ -19,13 +19,12 @@ export const display6Soft = {
 } as const;
 
 /**
- * Per-calendar event marker colours. Deliberately excludes blue: the color-6a
- * PNG path can only carry 4 distinct colours without merging, so the recipe is
- * kept to {white, black, red, green} to stop green collapsing into blue on the
- * device. red/green also carry day meaning in the month grid, but in the event
- * list a coloured bar reads clearly as a per-calendar marker.
+ * Per-calendar event marker colours. red/green carry day-level meaning in the
+ * month overview (holiday / weekend+vacation), so event dots are drawn from the
+ * remaining legible accents first, cycling deterministically by calendar order.
  */
 export const EVENT_ACCENTS = [
+	display6.blue,
 	display6.black,
 	display6.red,
 	display6.green,

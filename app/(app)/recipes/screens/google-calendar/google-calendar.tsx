@@ -179,7 +179,7 @@ export default function GoogleCalendar({
 			>
 				<span
 					className="font-inter font-bold leading-tight"
-					style={{ fontSize: px(40), color: display6.black }}
+					style={{ fontSize: px(40), color: display6.blue }}
 				>
 					Google Kalender
 				</span>
@@ -222,7 +222,7 @@ export default function GoogleCalendar({
 					</h1>
 					<span
 						className="font-inter"
-						style={{ fontSize: subSize, color: display6.black }}
+						style={{ fontSize: subSize, color: display6.blue }}
 					>
 						{showWeekNumbers ? `Uge ${weekNumber} · ` : ""}Google Kalender
 					</span>
