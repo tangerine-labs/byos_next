@@ -1,3 +1,4 @@
+import zlib from "node:zlib";
 import sharp from "sharp";
 import {
 	applyColorDithering,
@@ -383,6 +384,111 @@ async function renderGrayscalePng(
 }
 
 /** Color-palette analogue of renderGrayscalePng. */
+// --- Minimal indexed-PNG encoder ------------------------------------------
+// We encode the dithered indices against the EXACT palette ourselves instead
+// of letting sharp's `.png({ palette: true })` re-quantize. libimagequant picks
+// its own representative palette and merges/shifts colours (it collapsed
+// color-6a green and blue into one teal), which corrupts a recipe's deliberate
+// colour coding on the device. Writing the palette directly is lossless.
+
+const PNG_SIGNATURE = Buffer.from([
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+const CRC32_TABLE = (() => {
+	const table = new Uint32Array(256);
+	for (let n = 0; n < 256; n++) {
+		let c = n;
+		for (let k = 0; k < 8; k++) {
+			c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+		}
+		table[n] = c >>> 0;
+	}
+	return table;
+})();
+
+const crc32 = (buf: Buffer): number => {
+	let c = 0xffffffff;
+	for (let i = 0; i < buf.length; i++) {
+		c = CRC32_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+	}
+	return (c ^ 0xffffffff) >>> 0;
+};
+
+const pngChunk = (type: string, data: Buffer): Buffer => {
+	const length = Buffer.alloc(4);
+	length.writeUInt32BE(data.length, 0);
+	const typeAndData = Buffer.concat([Buffer.from(type, "ascii"), data]);
+	const crc = Buffer.alloc(4);
+	crc.writeUInt32BE(crc32(typeAndData), 0);
+	return Buffer.concat([length, typeAndData, crc]);
+};
+
+/** Smallest PNG indexed bit depth (1/2/4/8) that holds `numColors` entries. */
+const indexedBitDepth = (numColors: number): number =>
+	numColors <= 2 ? 1 : numColors <= 4 ? 2 : numColors <= 16 ? 4 : 8;
+
+/**
+ * Build an indexed (colour-type 3) PNG with an exact palette. `indices` is one
+ * palette index per pixel (row-major); `palette` is the RGB lookup table.
+ */
+const buildIndexedPng = (
+	width: number,
+	height: number,
+	indices: Uint8Array | number[],
+	palette: [number, number, number][],
+): Buffer => {
+	const bitDepth = indexedBitDepth(palette.length);
+	const pixelsPerByte = 8 / bitDepth;
+	const rowBytes = Math.ceil(width / pixelsPerByte);
+	const mask = (1 << bitDepth) - 1;
+
+	// Scanlines: a leading filter byte (0 = None) then big-endian packed indices.
+	const raw = Buffer.alloc((rowBytes + 1) * height);
+	let pos = 0;
+	for (let y = 0; y < height; y++) {
+		raw[pos++] = 0;
+		let acc = 0;
+		let bits = 0;
+		for (let x = 0; x < width; x++) {
+			acc = (acc << bitDepth) | (indices[y * width + x] & mask);
+			bits += bitDepth;
+			if (bits === 8) {
+				raw[pos++] = acc;
+				acc = 0;
+				bits = 0;
+			}
+		}
+		if (bits > 0) raw[pos++] = acc << (8 - bits); // pad final byte, MSB-first
+	}
+
+	const ihdr = Buffer.alloc(13);
+	ihdr.writeUInt32BE(width, 0);
+	ihdr.writeUInt32BE(height, 4);
+	ihdr.writeUInt8(bitDepth, 8);
+	ihdr.writeUInt8(3, 9); // colour type 3 = indexed
+	ihdr.writeUInt8(0, 10); // compression
+	ihdr.writeUInt8(0, 11); // filter
+	ihdr.writeUInt8(0, 12); // interlace
+
+	const plte = Buffer.alloc(palette.length * 3);
+	palette.forEach(([r, g, b], i) => {
+		plte[i * 3] = r;
+		plte[i * 3 + 1] = g;
+		plte[i * 3 + 2] = b;
+	});
+
+	const idat = zlib.deflateSync(raw, { level: 9 });
+
+	return Buffer.concat([
+		PNG_SIGNATURE,
+		pngChunk("IHDR", ihdr),
+		pngChunk("PLTE", plte),
+		pngChunk("IDAT", idat),
+		pngChunk("IEND", Buffer.alloc(0)),
+	]);
+};
+
 async function renderColorPng(
 	png: Buffer,
 	options: RenderBmpOptions,
@@ -417,20 +523,14 @@ async function renderColorPng(
 		palette: colorPalette,
 	});
 
-	const rgbTriplets = hexPalette.map(hexToRgb);
-	const out = Buffer.alloc(targetPixelCount * 3);
-	for (let i = 0; i < targetPixelCount; i++) {
-		const [r, g, b] = rgbTriplets[indices[i]] ?? [0, 0, 0];
-		out[i * 3] = r;
-		out[i * 3 + 1] = g;
-		out[i * 3 + 2] = b;
-	}
-
-	return sharp(out, {
-		raw: { width: targetWidth, height: targetHeight, channels: 3 },
-	})
-		.png({ compressionLevel: 9, palette: true, colours: hexPalette.length })
-		.toBuffer();
+	// Encode with the exact palette so every colour survives (no libimagequant
+	// merge/shift). indices already reference the dithered palette entries.
+	return buildIndexedPng(
+		targetWidth,
+		targetHeight,
+		indices,
+		hexPalette.map(hexToRgb),
+	);
 }
 
 /** Render a recipe PNG to a dithered, device-ready PNG (see renderGrayscalePng). */
