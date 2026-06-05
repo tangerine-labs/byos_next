@@ -19,6 +19,15 @@ export const display6Soft = {
 } as const;
 
 /**
+ * Chess-style 50% black/white raster (8×8 tile, 4px squares) for "normal" month
+ * days, so they read as a textured grey block — distinct from solid today/
+ * weekend/holiday cells and from blank out-of-month cells. Pure black+white, so
+ * it survives the palette dither untouched.
+ */
+export const CHESS_RASTER_URL =
+	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAGklEQVR4nGNgYGD4j4zRAQMdFGDRgYpprwAAA4afYZpfiEEAAAAASUVORK5CYII=";
+
+/**
  * Per-calendar event marker colours. red/green carry day-level meaning in the
  * month overview (holiday / weekend+vacation), so event dots are drawn from the
  * remaining legible accents first, cycling deterministically by calendar order.

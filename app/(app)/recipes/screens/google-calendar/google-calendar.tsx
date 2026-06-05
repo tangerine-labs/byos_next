@@ -6,7 +6,7 @@ import type {
 	MonthCell,
 	WeekDay,
 } from "./getData";
-import { display6 } from "./tokens";
+import { CHESS_RASTER_URL, display6 } from "./tokens";
 
 type Props = Partial<GoogleCalendarData> & {
 	width?: number;
@@ -66,7 +66,7 @@ export default function GoogleCalendar({
 
 	// Pixel-perfect colour-only month grid: 5×5px cells with a 1px gap, sized
 	// with explicit px tracks (not fr) so every day is exactly square.
-	const miniCell = px(16);
+	const miniCell = px(32);
 	const monthGap = px(1);
 	const monthColW = miniCell * 7 + monthGap * 6;
 
@@ -245,22 +245,39 @@ export default function GoogleCalendar({
 								gap: monthGap,
 							}}
 						>
-							{monthCells.map((cell, i) => (
-								<div
-									key={`${cell.day}-${i}`}
-									style={{
-										width: miniCell,
-										height: miniCell,
-										backgroundColor: cellColor(cell),
-										// Outline in-month days so white/normal cells are visible
-										// and the grid reads as a full month; out-of-month stays blank.
-										border: cell.inMonth
-											? `${px(1)}px solid ${display6.black}`
-											: undefined,
-										boxSizing: "border-box",
-									}}
-								/>
-							))}
+							{monthCells.map((cell, i) => {
+								// "Plain" = an in-month day with no special colour; it gets the
+								// chess raster so it reads as a textured cell rather than blank.
+								const isPlain =
+									cell.inMonth &&
+									!cell.isToday &&
+									!cell.isHoliday &&
+									!cell.isVacation &&
+									!cell.isWeekend;
+								return (
+									<div
+										key={`${cell.day}-${i}`}
+										style={{
+											width: miniCell,
+											height: miniCell,
+											backgroundColor: cellColor(cell),
+											...(isPlain
+												? {
+														backgroundImage: `url(${CHESS_RASTER_URL})`,
+														backgroundSize: `${px(8)}px ${px(8)}px`,
+														imageRendering: "pixelated" as const,
+													}
+												: {}),
+											// Outline in-month days so the grid reads as a full month;
+											// out-of-month stays blank.
+											border: cell.inMonth
+												? `${px(1)}px solid ${display6.black}`
+												: undefined,
+											boxSizing: "border-box",
+										}}
+									/>
+								);
+							})}
 						</div>
 					</section>
 
