@@ -92,10 +92,7 @@ export default function GoogleCalendar({
 		>
 			<span
 				className="font-inter font-bold leading-none"
-				style={{
-					fontSize: eventTime,
-					color: ev.allDay ? ev.color : display6.black,
-				}}
+				style={{ fontSize: eventTime, color: display6.black }}
 			>
 				{ev.allDay ? "hele dagen" : ev.startLabel}
 			</span>
