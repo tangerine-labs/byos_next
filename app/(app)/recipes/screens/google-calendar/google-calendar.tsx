@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { PreSatori } from "@/utils/pre-satori";
 import type {
 	CalendarEvent,
@@ -12,16 +13,29 @@ type Props = Partial<GoogleCalendarData> & {
 	height?: number;
 };
 
-/** Background fill for a month-overview cell (holiday > vacation/weekend). */
+type DayFlags = { isHoliday: boolean; isVacation: boolean; isWeekend: boolean };
+
+/**
+ * Text colour for an inverted "today" (black background): the day-type colour,
+ * defaulting to white for an ordinary day. holiday > vacation/weekend.
+ */
+function todayForeground(d: DayFlags): string {
+	if (d.isHoliday) return display6.red;
+	if (d.isVacation || d.isWeekend) return display6.green;
+	return display6.white;
+}
+
+/** Background fill for a month-overview cell (today > holiday > vacation/weekend). */
 function cellFill(cell: MonthCell): { bg: string; fg: string } {
 	if (!cell.inMonth) return { bg: display6.white, fg: "#999999" };
+	if (cell.isToday) return { bg: display6.black, fg: todayForeground(cell) };
 	if (cell.isHoliday) return { bg: display6Soft.red, fg: display6.black };
 	if (cell.isVacation || cell.isWeekend)
 		return { bg: display6Soft.green, fg: display6.black };
 	return { bg: display6.white, fg: display6.black };
 }
 
-/** Day-header text colour for the week view. */
+/** Day-type colour for the week-view underline (red holiday, green weekend). */
 function headerColor(day: WeekDay): string {
 	if (day.isHoliday) return display6.red;
 	if (day.isVacation || day.isWeekend) return display6.green;
@@ -100,6 +114,20 @@ export default function GoogleCalendar({
 
 	const renderDay = (day: WeekDay) => {
 		const accent = headerColor(day);
+		// Today inverts to a black block with day-type-coloured text; other days
+		// keep black text with the day-type colour on the underline.
+		const textColor = day.isToday ? todayForeground(day) : display6.black;
+		const headerStyle: CSSProperties = day.isToday
+			? {
+					backgroundColor: display6.black,
+					padding: px(6),
+					marginBottom: px(8),
+				}
+			: {
+					borderBottom: `${px(2)}px solid ${accent}`,
+					paddingBottom: px(4),
+					marginBottom: px(8),
+				};
 		return (
 			<div
 				key={day.dateStr}
@@ -111,19 +139,10 @@ export default function GoogleCalendar({
 					minHeight: 0,
 				}}
 			>
-				<div
-					className="flex shrink-0 flex-col items-start"
-					style={{
-						borderBottom: day.isToday
-							? `${px(4)}px solid ${display6.black}`
-							: `${px(2)}px solid ${accent}`,
-						paddingBottom: px(4),
-						marginBottom: px(8),
-					}}
-				>
+				<div className="flex shrink-0 flex-col items-start" style={headerStyle}>
 					<span
 						className="font-inter font-bold uppercase leading-none"
-						style={{ fontSize: dayHeadSize, color: display6.black }}
+						style={{ fontSize: dayHeadSize, color: textColor }}
 					>
 						{day.weekdayLabel}
 					</span>
@@ -131,7 +150,7 @@ export default function GoogleCalendar({
 						className="font-inter leading-none"
 						style={{
 							fontSize: dayNumSize,
-							color: display6.black,
+							color: textColor,
 							fontWeight: day.isToday ? 700 : 400,
 						}}
 					>
