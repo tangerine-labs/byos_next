@@ -63,6 +63,8 @@ export type GoogleCalendarData = {
 	weekDays: WeekDay[];
 	weekNumber: number;
 	showWeekNumbers: boolean;
+	/** Calendars (with events) and their accent colour, for the legend. */
+	calendars: CalendarLegendEntry[];
 };
 
 type GoogleCalendarParams = {
@@ -120,9 +122,12 @@ function dayStartInstantISO(d: Temporal.PlainDate): string {
 
 type NormalizedEvent = CalendarEvent & { dateStr: string };
 
+export type CalendarLegendEntry = { name: string; color: string };
+
 type CalendarPayload = {
 	events: NormalizedEvent[];
 	vacationDates: string[];
+	calendars: CalendarLegendEntry[];
 };
 
 /**
@@ -171,8 +176,8 @@ function buildCalendarPayloadFetcher() {
 			const vacationMatch = args.vacationCalendar.trim().toLowerCase();
 
 			const calendars = await listCalendars(accessToken);
-			const eventsPerCalendar = await Promise.all(
-				calendars.map((cal, index) =>
+			const perCalendar = await Promise.all(
+				calendars.map((cal) =>
 					listEvents(
 						accessToken,
 						cal.id,
@@ -180,7 +185,7 @@ function buildCalendarPayloadFetcher() {
 						args.timeMaxISO,
 					).then((events) => ({
 						events,
-						color: accentForIndex(index),
+						name: cal.summary ?? "",
 						isVacation:
 							vacationMatch.length > 0 &&
 							(cal.summary ?? "").toLowerCase().includes(vacationMatch),
@@ -188,10 +193,16 @@ function buildCalendarPayloadFetcher() {
 				),
 			);
 
+			// Only calendars with events get an accent, cycled in their order so
+			// the legend reads as a clean black → blue → yellow → green sequence.
+			const active = perCalendar
+				.filter((g) => g.events.length > 0)
+				.map((g, i) => ({ ...g, color: accentForIndex(i) }));
+
 			const out: NormalizedEvent[] = [];
 			const vacationDates = new Set<string>();
 
-			for (const group of eventsPerCalendar) {
+			for (const group of active) {
 				for (const ev of group.events) {
 					const title = ev.summary?.trim() || "(uden titel)";
 					if (ev.start.date) {
@@ -229,7 +240,15 @@ function buildCalendarPayloadFetcher() {
 				}
 			}
 
-			return { events: out, vacationDates: [...vacationDates] };
+			const legend: CalendarLegendEntry[] = active
+				.filter((g) => g.name)
+				.map((g) => ({ name: g.name, color: g.color }));
+
+			return {
+				events: out,
+				vacationDates: [...vacationDates],
+				calendars: legend,
+			};
 		},
 		["google-calendar-payload"],
 		{ revalidate: 300, tags: ["google-calendar"] },
@@ -294,7 +313,11 @@ export default async function getData(
 	const connected =
 		configured && userId ? await isCalendarConnected(userId) : false;
 
-	let payload: CalendarPayload = { events: [], vacationDates: [] };
+	let payload: CalendarPayload = {
+		events: [],
+		vacationDates: [],
+		calendars: [],
+	};
 	if (connected && userId) {
 		try {
 			payload = await getCachedCalendarPayload({
@@ -307,7 +330,7 @@ export default async function getData(
 			});
 		} catch {
 			// Leave events empty; the week view simply shows no entries.
-			payload = { events: [], vacationDates: [] };
+			payload = { events: [], vacationDates: [], calendars: [] };
 		}
 	}
 
@@ -382,5 +405,6 @@ export default async function getData(
 		weekDays,
 		weekNumber: today.weekOfYear ?? 0,
 		showWeekNumbers,
+		calendars: payload.calendars,
 	};
 }

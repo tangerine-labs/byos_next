@@ -56,6 +56,7 @@ export default function GoogleCalendar({
 	weekDays = [],
 	weekNumber = 0,
 	showWeekNumbers = true,
+	calendars = [],
 }: Props) {
 	// Layout designed against a 1600×1200 reference; scales uniformly to the
 	// actual canvas (Inky 13.3 default → ×1, smaller panels → down).
@@ -331,6 +332,46 @@ export default function GoogleCalendar({
 								];
 							})}
 						</div>
+
+						{/* Legend: calendar → accent colour */}
+						{calendars.length > 0 && (
+							<div
+								className="flex flex-col"
+								style={{ marginTop: px(28), gap: px(10) }}
+							>
+								{calendars.map((cal, i) => (
+									<div
+										key={`leg-${i}-${cal.name}`}
+										className="flex items-center"
+										style={{ gap: px(10) }}
+									>
+										<div
+											style={{
+												width: px(20),
+												height: px(20),
+												backgroundColor: cal.color,
+												border: `${px(1)}px solid ${display6.black}`,
+												boxSizing: "border-box",
+												flexShrink: 0,
+											}}
+										/>
+										<span
+											className="font-inter leading-tight"
+											style={{
+												fontSize: px(19),
+												color: display6.black,
+												display: "-webkit-box",
+												WebkitLineClamp: 2,
+												WebkitBoxOrient: "vertical" as const,
+												overflow: "hidden",
+											}}
+										>
+											{cal.name}
+										</span>
+									</div>
+								))}
+							</div>
+						)}
 					</section>
 
 					{/* Week view */}

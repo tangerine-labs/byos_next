@@ -28,14 +28,13 @@ export const CHESS_RASTER_URL =
 	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAGklEQVR4nGNgYGD4j4zRAQMdFGDRgYpprwAAA4afYZpfiEEAAAAASUVORK5CYII=";
 
 /**
- * Per-calendar event marker colours. red/green carry day-level meaning in the
- * month overview (holiday / weekend+vacation), so event dots are drawn from the
- * remaining legible accents first, cycling deterministically by calendar order.
+ * Per-calendar event marker colours, cycled by calendar order. Excludes red
+ * (reserved for holidays in the month grid).
  */
 export const EVENT_ACCENTS = [
-	display6.blue,
 	display6.black,
-	display6.red,
+	display6.blue,
+	display6.yellow,
 	display6.green,
 ] as const;
 
