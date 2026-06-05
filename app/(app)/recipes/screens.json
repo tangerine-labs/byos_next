@@ -283,5 +283,35 @@
 		},
 		"version": "1.0.0",
 		"category": "system-components"
+	},
+	"playdate": {
+		"title": "Playdate Catalog",
+		"published": true,
+		"createdAt": "2026-06-05T00:00:00Z",
+		"updatedAt": "2026-06-05T00:00:00Z",
+		"description": "Cycles through title cards from the Playdate Catalog (play.date/games). Picks a random game each render and shows its feature art — a natural fit for 1-bit e-ink.",
+		"componentPath": "./screens/playdate",
+		"hasDataFetch": true,
+		"props": {
+			"name": "ClayDate",
+			"developer": "Itamar Ernst"
+		},
+		"params": {
+			"gameSlug": {
+				"type": "string",
+				"label": "Pin a game (optional)",
+				"description": "Catalog slug to always show, e.g. 'mars-after-midnight'. Leave blank to cycle through random games.",
+				"default": "",
+				"placeholder": "mars-after-midnight"
+			}
+		},
+		"tags": ["bitmap", "image", "api", "live-data", "games"],
+		"author": {
+			"name": "BYOS",
+			"github": ""
+		},
+		"renderSettings": {},
+		"version": "0.1.0",
+		"category": "display-components"
 	}
 }
