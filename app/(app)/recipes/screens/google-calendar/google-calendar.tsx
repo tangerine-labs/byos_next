@@ -64,6 +64,11 @@ export default function GoogleCalendar({
 	const monthColW = px(440);
 	const gap = px(28);
 
+	// Square month cells: derive the row height from the column width (7 columns
+	// sharing monthColW minus the inter-cell gaps) so days aren't stretched tall.
+	const monthGap = px(3);
+	const miniCell = Math.floor((monthColW - monthGap * 6) / 7);
+
 	const titleSize = px(56);
 	const subSize = px(26);
 	const miniWeekday = px(20);
@@ -238,7 +243,7 @@ export default function GoogleCalendar({
 					<section className="flex flex-col" style={{ minHeight: 0 }}>
 						<div
 							className="grid shrink-0 grid-cols-7"
-							style={{ paddingBottom: px(6) }}
+							style={{ paddingBottom: px(6), columnGap: monthGap }}
 						>
 							{weekdayLabels.map((label) => (
 								<div
@@ -251,8 +256,11 @@ export default function GoogleCalendar({
 							))}
 						</div>
 						<div
-							className="grid flex-1 grid-cols-7"
-							style={{ gridTemplateRows: "repeat(6, 1fr)", gap: px(3) }}
+							className="grid shrink-0 grid-cols-7"
+							style={{
+								gridTemplateRows: `repeat(6, ${miniCell}px)`,
+								gap: monthGap,
+							}}
 						>
 							{monthCells.map((cell, i) => {
 								const { bg, fg } = cellFill(cell);
