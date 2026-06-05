@@ -5,7 +5,7 @@ import type {
 	MonthCell,
 	WeekDay,
 } from "./getData";
-import { display6 } from "./tokens";
+import { display6, display6Soft } from "./tokens";
 
 type Props = Partial<GoogleCalendarData> & {
 	width?: number;
@@ -15,9 +15,9 @@ type Props = Partial<GoogleCalendarData> & {
 /** Background fill for a month-overview cell (holiday > vacation/weekend). */
 function cellFill(cell: MonthCell): { bg: string; fg: string } {
 	if (!cell.inMonth) return { bg: display6.white, fg: "#999999" };
-	if (cell.isHoliday) return { bg: display6.red, fg: display6.white };
+	if (cell.isHoliday) return { bg: display6Soft.red, fg: display6.black };
 	if (cell.isVacation || cell.isWeekend)
-		return { bg: display6.green, fg: display6.black };
+		return { bg: display6Soft.green, fg: display6.black };
 	return { bg: display6.white, fg: display6.black };
 }
 
@@ -123,7 +123,7 @@ export default function GoogleCalendar({
 				>
 					<span
 						className="font-inter font-bold uppercase leading-none"
-						style={{ fontSize: dayHeadSize, color: accent }}
+						style={{ fontSize: dayHeadSize, color: display6.black }}
 					>
 						{day.weekdayLabel}
 					</span>

@@ -9,6 +9,16 @@ export const display6 = {
 } as const;
 
 /**
+ * 50%-opacity fills for the month overview (over a white background). The idea
+ * is that the server dither / device renders these as a lighter tint of the
+ * pure palette colour rather than a vibrant solid block.
+ */
+export const display6Soft = {
+	red: "rgba(255, 0, 0, 0.5)",
+	green: "rgba(0, 255, 0, 0.5)",
+} as const;
+
+/**
  * Per-calendar event marker colours. red/green carry day-level meaning in the
  * month overview (holiday / weekend+vacation), so event dots are drawn from the
  * remaining legible accents first, cycling deterministically by calendar order.
