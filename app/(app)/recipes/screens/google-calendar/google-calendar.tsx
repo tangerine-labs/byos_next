@@ -6,7 +6,7 @@ import type {
 	MonthCell,
 	WeekDay,
 } from "./getData";
-import { display6, display6Soft } from "./tokens";
+import { display6 } from "./tokens";
 
 type Props = Partial<GoogleCalendarData> & {
 	width?: number;
@@ -25,14 +25,16 @@ function todayForeground(d: DayFlags): string {
 	return display6.white;
 }
 
-/** Background fill for a month-overview cell (today > holiday > vacation/weekend). */
-function cellFill(cell: MonthCell): { bg: string; fg: string } {
-	if (!cell.inMonth) return { bg: display6.white, fg: "#999999" };
-	if (cell.isToday) return { bg: display6.black, fg: todayForeground(cell) };
-	if (cell.isHoliday) return { bg: display6Soft.red, fg: display6.black };
-	if (cell.isVacation || cell.isWeekend)
-		return { bg: display6Soft.green, fg: display6.black };
-	return { bg: display6.white, fg: display6.black };
+/**
+ * Colour for a month-overview cell in the pixel-perfect micro-grid: today wins,
+ * then holiday, then weekend/vacation; everything else (and out-of-month) blank.
+ */
+function cellColor(cell: MonthCell): string {
+	if (!cell.inMonth) return display6.white;
+	if (cell.isToday) return display6.black;
+	if (cell.isHoliday) return display6.red;
+	if (cell.isVacation || cell.isWeekend) return display6.green;
+	return display6.white;
 }
 
 /** Day-type colour for the week-view underline (red holiday, green weekend). */
@@ -48,7 +50,6 @@ export default function GoogleCalendar({
 	connected = false,
 	configured = false,
 	monthTitle = "",
-	weekdayLabels = [],
 	monthCells = [],
 	weekDays = [],
 	weekNumber = 0,
@@ -61,18 +62,16 @@ export default function GoogleCalendar({
 
 	const pad = px(36);
 	const headerH = px(96);
-	const monthColW = px(440);
 	const gap = px(28);
 
-	// Square month cells: derive the row height from the column width (7 columns
-	// sharing monthColW minus the inter-cell gaps) so days aren't stretched tall.
-	const monthGap = px(3);
-	const miniCell = Math.floor((monthColW - monthGap * 6) / 7);
+	// Pixel-perfect colour-only month grid: 5×5px cells with a 1px gap, sized
+	// with explicit px tracks (not fr) so every day is exactly square.
+	const miniCell = px(5);
+	const monthGap = px(1);
+	const monthColW = miniCell * 7 + monthGap * 6;
 
 	const titleSize = px(56);
 	const subSize = px(26);
-	const miniWeekday = px(20);
-	const miniDay = px(28);
 	const dayHeadSize = px(30);
 	const dayNumSize = px(40);
 	const eventTime = px(20);
@@ -239,49 +238,26 @@ export default function GoogleCalendar({
 						minHeight: 0,
 					}}
 				>
-					{/* Month overview */}
+					{/* Month overview — pixel-perfect colour-only micro-grid */}
 					<section className="flex flex-col" style={{ minHeight: 0 }}>
 						<div
-							className="grid shrink-0 grid-cols-7"
-							style={{ paddingBottom: px(6), columnGap: monthGap }}
-						>
-							{weekdayLabels.map((label) => (
-								<div
-									key={label}
-									className="flex items-center justify-center font-inter font-bold uppercase"
-									style={{ fontSize: miniWeekday, color: display6.black }}
-								>
-									{label}
-								</div>
-							))}
-						</div>
-						<div
-							className="grid shrink-0 grid-cols-7"
+							className="grid shrink-0"
 							style={{
+								gridTemplateColumns: `repeat(7, ${miniCell}px)`,
 								gridTemplateRows: `repeat(6, ${miniCell}px)`,
 								gap: monthGap,
 							}}
 						>
-							{monthCells.map((cell, i) => {
-								const { bg, fg } = cellFill(cell);
-								return (
-									<div
-										key={`${cell.day}-${i}`}
-										className="flex items-center justify-center font-inter leading-none"
-										style={{
-											backgroundColor: bg,
-											color: fg,
-											fontSize: miniDay,
-											border: cell.isToday
-												? `${px(4)}px solid ${display6.black}`
-												: `${px(1)}px solid #CCCCCC`,
-											boxSizing: "border-box",
-										}}
-									>
-										{cell.day}
-									</div>
-								);
-							})}
+							{monthCells.map((cell, i) => (
+								<div
+									key={`${cell.day}-${i}`}
+									style={{
+										width: miniCell,
+										height: miniCell,
+										backgroundColor: cellColor(cell),
+									}}
+								/>
+							))}
 						</div>
 					</section>
 
