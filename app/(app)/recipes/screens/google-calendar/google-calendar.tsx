@@ -4,6 +4,7 @@ import type {
 	CalendarEvent,
 	GoogleCalendarData,
 	MonthCell,
+	SpanEvent,
 	WeekDay,
 } from "./getData";
 import { display6, display6Soft } from "./tokens";
@@ -46,6 +47,13 @@ function headerColor(day: WeekDay): string {
 	return display6.black;
 }
 
+/** Readable text colour over a solid palette background (yellow/green → black). */
+function textOn(background: string): string {
+	return background === display6.yellow || background === display6.green
+		? display6.black
+		: display6.white;
+}
+
 export default function GoogleCalendar({
 	width = 1600,
 	height = 1200,
@@ -59,6 +67,7 @@ export default function GoogleCalendar({
 	nextMonthCells = [],
 	nextMonthWeeks = [],
 	weekDays = [],
+	spanningEvents = [],
 	weekNumber = 0,
 	showWeekNumbers = true,
 	calendars = [],
@@ -139,34 +148,26 @@ export default function GoogleCalendar({
 		);
 	};
 
-	const renderDay = (day: WeekDay) => {
+	// The week view is three column-aligned rows: weekday headers, the spanning
+	// all-day band, then the per-day timed/single events. All three use the same
+	// 7-column grid + gap so blocks in the band line up with the columns below.
+	const colCell: CSSProperties = {
+		borderLeft: `${px(1)}px solid #DDDDDD`,
+		paddingLeft: px(6),
+		paddingRight: px(4),
+	};
+
+	const renderDayHeader = (day: WeekDay) => {
 		const accent = headerColor(day);
 		// Today inverts to a black block with day-type-coloured text; other days
 		// keep black text with the day-type colour on the underline.
 		const textColor = day.isToday ? todayForeground(day) : display6.black;
 		const headerStyle: CSSProperties = day.isToday
-			? {
-					backgroundColor: display6.black,
-					padding: px(6),
-					marginBottom: px(8),
-				}
-			: {
-					borderBottom: `${px(2)}px solid ${accent}`,
-					paddingBottom: px(4),
-					marginBottom: px(8),
-				};
+			? { backgroundColor: display6.black, padding: px(6) }
+			: { borderBottom: `${px(2)}px solid ${accent}`, paddingBottom: px(4) };
 		return (
-			<div
-				key={day.dateStr}
-				className="flex flex-col"
-				style={{
-					borderLeft: `${px(1)}px solid #DDDDDD`,
-					paddingLeft: px(6),
-					paddingRight: px(4),
-					minHeight: 0,
-				}}
-			>
-				<div className="flex shrink-0 flex-col items-start" style={headerStyle}>
+			<div key={day.dateStr} className="flex shrink-0 flex-col" style={colCell}>
+				<div className="flex flex-col items-start" style={headerStyle}>
 					<span
 						className="font-inter font-bold uppercase leading-none"
 						style={{ fontSize: dayHeadSize, color: textColor }}
@@ -184,12 +185,64 @@ export default function GoogleCalendar({
 						{day.dayNum}
 					</span>
 				</div>
-				<div
-					className="flex flex-col"
-					style={{ gap: px(6), overflow: "hidden", minHeight: 0 }}
+			</div>
+		);
+	};
+
+	const renderDayBody = (day: WeekDay) => (
+		<div
+			key={day.dateStr}
+			className="flex flex-col"
+			style={{ ...colCell, gap: px(6), overflow: "hidden", minHeight: 0 }}
+		>
+			{day.events.map((ev, i) => renderEvent(ev, `${day.dateStr}-${i}`))}
+		</div>
+	);
+
+	// A multi-day event drawn as one block spanning its day columns. Edges that
+	// run off the visible week are flattened (no rounded corner + a chevron).
+	const renderSpanBlock = (span: SpanEvent, row: number) => {
+		const base = span.colors[0] ?? display6.black;
+		const background =
+			span.colors.length >= 2
+				? `repeating-linear-gradient(135deg, ${span.colors[0]} 0 ${px(8)}px, ${span.colors[1]} ${px(8)}px ${px(16)}px)`
+				: base;
+		const fg = textOn(base);
+		const r = px(6);
+		return (
+			<div
+				key={`span-${row}-${span.title}`}
+				className="flex items-center"
+				style={{
+					gridColumn: `${span.startIndex + 1} / span ${span.span}`,
+					gridRow: row + 1,
+					background,
+					color: fg,
+					paddingLeft: px(8),
+					paddingRight: px(8),
+					paddingTop: px(4),
+					paddingBottom: px(4),
+					borderTopLeftRadius: span.continuesBefore ? 0 : r,
+					borderBottomLeftRadius: span.continuesBefore ? 0 : r,
+					borderTopRightRadius: span.continuesAfter ? 0 : r,
+					borderBottomRightRadius: span.continuesAfter ? 0 : r,
+					overflow: "hidden",
+				}}
+			>
+				<span
+					className="font-inter font-bold leading-none"
+					style={{
+						fontSize: eventTitle,
+						color: fg,
+						whiteSpace: "nowrap",
+						overflow: "hidden",
+						textOverflow: "ellipsis",
+					}}
 				>
-					{day.events.map((ev, i) => renderEvent(ev, `${day.dateStr}-${i}`))}
-				</div>
+					{span.continuesBefore ? "‹ " : ""}
+					{span.title}
+					{span.continuesAfter ? " ›" : ""}
+				</span>
 			</div>
 		);
 	};
@@ -435,17 +488,40 @@ export default function GoogleCalendar({
 						)}
 					</section>
 
-					{/* Week view */}
+					{/* Week view: headers, the spanning all-day band, then day columns */}
 					{connected ? (
 						<section
-							className="grid"
-							style={{
-								gridTemplateColumns: "repeat(7, 1fr)",
-								gap: px(2),
-								minHeight: 0,
-							}}
+							className="flex flex-col"
+							style={{ gap: px(8), minHeight: 0 }}
 						>
-							{weekDays.map((day) => renderDay(day))}
+							<div
+								className="grid shrink-0"
+								style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: px(2) }}
+							>
+								{weekDays.map((day) => renderDayHeader(day))}
+							</div>
+							{spanningEvents.length > 0 && (
+								<div
+									className="grid shrink-0"
+									style={{
+										gridTemplateColumns: "repeat(7, 1fr)",
+										gap: px(2),
+										rowGap: px(3),
+									}}
+								>
+									{spanningEvents.map((s, i) => renderSpanBlock(s, i))}
+								</div>
+							)}
+							<div
+								className="grid flex-1"
+								style={{
+									gridTemplateColumns: "repeat(7, 1fr)",
+									gap: px(2),
+									minHeight: 0,
+								}}
+							>
+								{weekDays.map((day) => renderDayBody(day))}
+							</div>
 						</section>
 					) : (
 						renderNotConnected()

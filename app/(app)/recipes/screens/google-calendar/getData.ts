@@ -189,6 +189,24 @@ export type WeekDay = {
 	events: CalendarEvent[];
 };
 
+/**
+ * A multi-day all-day event, positioned within the visible week as a block that
+ * spans day columns (Google Calendar's "all-day" band above the timed events).
+ */
+export type SpanEvent = {
+	title: string;
+	/** Marker/background colours: 1 = solid; 2 = striped (overlapping calendars). */
+	colors: string[];
+	/** 0-based column (weekday) where the block starts in this week. */
+	startIndex: number;
+	/** Number of day columns the block covers in this week (1–7). */
+	span: number;
+	/** The event began before this week (flatten the left edge). */
+	continuesBefore: boolean;
+	/** The event continues after this week (flatten the right edge). */
+	continuesAfter: boolean;
+};
+
 export type GoogleCalendarData = {
 	connected: boolean;
 	configured: boolean;
@@ -204,6 +222,8 @@ export type GoogleCalendarData = {
 	nextMonthCells: MonthCell[];
 	nextMonthWeeks: number[];
 	weekDays: WeekDay[];
+	/** Multi-day all-day events drawn as spanning blocks above the week columns. */
+	spanningEvents: SpanEvent[];
 	weekNumber: number;
 	showWeekNumbers: boolean;
 	/** Calendars (with events) and their accent colour, for the legend. */
@@ -265,7 +285,18 @@ function dayStartInstantISO(d: Temporal.PlainDate): string {
 
 // ---- Normalized event shape produced by the (cached) network fetch ----
 
-type NormalizedEvent = CalendarEvent & { dateStr: string };
+// `endDateStr` (exclusive, clipped to the fetch range) is set only for all-day
+// events, so the week view can tell single-day all-day events apart from
+// multi-day spans without re-fetching.
+type NormalizedEvent = CalendarEvent & {
+	dateStr: string;
+	endDateStr?: string;
+};
+
+/** Whole days from `a` to `b` (b exclusive). Negative if b precedes a. */
+function daysBetween(a: Temporal.PlainDate, b: Temporal.PlainDate): number {
+	return a.until(b, { largestUnit: "day" }).days;
+}
 
 export type CalendarLegendEntry = { name: string; color: string };
 
@@ -345,24 +376,33 @@ export function assembleCalendarPayload(
 		for (const ev of group.events) {
 			const title = ev.summary?.trim() || "(uden titel)";
 			if (ev.start.date) {
-				// All-day event.
+				// All-day event. Google's end.date is exclusive; default a missing
+				// one to a single day. Keep one entry carrying the (clipped) range so
+				// the week view can render multi-day events as a single spanning block.
+				const endExclusive =
+					ev.end.date ??
+					Temporal.PlainDate.from(ev.start.date).add({ days: 1 }).toString();
 				const dates = expandAllDay(
 					ev.start.date,
-					ev.end.date ?? ev.start.date,
+					endExclusive,
 					rangeStart,
 					rangeEndExcl,
 				);
-				for (const dateStr of dates) {
-					if (group.isVacation) vacationDates.add(dateStr);
-					out.push({
-						dateStr,
-						title,
-						allDay: true,
-						startLabel: "",
-						startEpoch: 0,
-						colors: [group.color],
-					});
+				if (dates.length === 0) continue; // entirely outside the fetch range
+				if (group.isVacation) {
+					for (const dateStr of dates) vacationDates.add(dateStr);
 				}
+				out.push({
+					dateStr: dates[0],
+					endDateStr: Temporal.PlainDate.from(dates[dates.length - 1])
+						.add({ days: 1 })
+						.toString(),
+					title,
+					allDay: true,
+					startLabel: "",
+					startEpoch: 0,
+					colors: [group.color],
+				});
 			} else if (ev.start.dateTime) {
 				// Timed event.
 				const inst = Temporal.Instant.from(ev.start.dateTime);
@@ -586,9 +626,59 @@ export default async function getData(
 	);
 	const nextMonthTitle = monthYearFormat.format(labelDate(nextMonthFirst));
 
-	// Group events onto week days.
+	// A multi-day all-day event spans ≥2 calendar days.
+	const isMultiDay = (ev: NormalizedEvent): boolean =>
+		ev.allDay &&
+		ev.endDateStr !== undefined &&
+		daysBetween(
+			Temporal.PlainDate.from(ev.dateStr),
+			Temporal.PlainDate.from(ev.endDateStr),
+		) >= 2;
+
+	// Spanning band: multi-day all-day events clipped to the visible week, drawn
+	// as blocks above the day columns. Identical events from several calendars
+	// (same title + range) merge into one block with up to two striped colours.
+	const spanAccum = new Map<string, SpanEvent>();
+	for (const ev of payload.events) {
+		if (!isMultiDay(ev) || !ev.endDateStr) continue;
+		const evStart = Temporal.PlainDate.from(ev.dateStr);
+		const evEndExcl = Temporal.PlainDate.from(ev.endDateStr);
+		// Intersect [evStart, evEndExcl) with [weekStart, weekEndExcl).
+		const clipStart =
+			Temporal.PlainDate.compare(evStart, weekStart) >= 0 ? evStart : weekStart;
+		const clipEndExcl =
+			Temporal.PlainDate.compare(evEndExcl, weekEndExcl) <= 0
+				? evEndExcl
+				: weekEndExcl;
+		if (Temporal.PlainDate.compare(clipStart, clipEndExcl) >= 0) continue;
+
+		const key = `${ev.title}|${ev.dateStr}|${ev.endDateStr}`;
+		const existing = spanAccum.get(key);
+		if (existing) {
+			existing.colors = [...new Set([...existing.colors, ...ev.colors])].slice(
+				0,
+				2,
+			);
+			continue;
+		}
+		spanAccum.set(key, {
+			title: ev.title,
+			colors: ev.colors.slice(0, 2),
+			startIndex: daysBetween(weekStart, clipStart),
+			span: daysBetween(clipStart, clipEndExcl),
+			continuesBefore: Temporal.PlainDate.compare(evStart, weekStart) < 0,
+			continuesAfter: Temporal.PlainDate.compare(evEndExcl, weekEndExcl) > 0,
+		});
+	}
+	const spanningEvents = [...spanAccum.values()].sort(
+		(a, b) => a.startIndex - b.startIndex || b.span - a.span,
+	);
+
+	// Group the remaining (single-day all-day + timed) events onto week days.
+	// Multi-day events live in the spanning band, not the per-day columns.
 	const eventsByDate = new Map<string, CalendarEvent[]>();
 	for (const ev of payload.events) {
+		if (isMultiDay(ev)) continue;
 		const list = eventsByDate.get(ev.dateStr) ?? [];
 		list.push({
 			title: ev.title,
@@ -626,6 +716,7 @@ export default async function getData(
 		nextMonthCells,
 		nextMonthWeeks,
 		weekDays,
+		spanningEvents,
 		weekNumber: today.weekOfYear ?? 0,
 		showWeekNumbers,
 		calendars: payload.calendars,

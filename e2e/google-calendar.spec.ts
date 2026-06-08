@@ -52,6 +52,42 @@ test.describe("google-calendar recipe (fixture data)", () => {
 		}
 	});
 
+	test("renders a multi-day event as one spanning block", async ({ page }) => {
+		await page.goto(PREVIEW_URL);
+
+		// Pokémon GO Fest 2026 (Fri–Sun) is drawn as a single block spanning its
+		// day columns, not repeated once per day.
+		const block = page.locator('[style*="grid-column"]');
+		await expect(block).toHaveCount(1);
+		await expect(block).toContainText("Pokémon GO Fest 2026");
+		// Friday is column 5 (Mon-first), Fri→Sun covers 3 columns.
+		await expect(block).toHaveAttribute("style", /grid-column:\s*5 \/ span 3/);
+	});
+
+	test("a combined event shows both calendars' colours (striped)", async ({
+		page,
+	}) => {
+		await page.goto(PREVIEW_URL);
+
+		// Scouts is on Bjørn (black) + Irena (blue) → the single combined event,
+		// rendered as one striped marker carrying both colours.
+		const striped = page.locator('[style*="repeating-linear-gradient"]');
+		await expect(striped).toHaveCount(1);
+
+		const style = (await striped.getAttribute("style"))?.toLowerCase() ?? "";
+		expect(style).toContain("#000000"); // Bjørn
+		expect(style).toContain("#0000ff"); // Irena
+
+		// The striped marker sits in the same event as "Scouts".
+		await expect(
+			page
+				.locator("div")
+				.filter({ has: striped })
+				.filter({ hasText: "Scouts" })
+				.last(),
+		).toContainText("Scouts");
+	});
+
 	test("device bitmap renders a populated calendar", async ({ request }) => {
 		const res = await request.get(
 			"/api/bitmap/google-calendar.png?width=1600&height=1200",
