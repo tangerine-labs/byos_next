@@ -51,6 +51,40 @@ function parseCalendarColors(json: string): ColorRule[] {
 	}
 }
 
+// Legend grouping order: red (holidays) first, then the accent cycle order.
+// Custom hex colours fall after these, ranked by first appearance.
+const LEGEND_COLOR_ORDER = [
+	display6.red,
+	display6.black,
+	display6.blue,
+	display6.yellow,
+	display6.green,
+] as const;
+
+/**
+ * Group legend entries by colour so all calendars sharing a colour sit together
+ * (all red after each other, etc.). Stable within each colour group.
+ */
+function groupLegendByColor(
+	legend: CalendarLegendEntry[],
+): CalendarLegendEntry[] {
+	const rank = new Map<string, number>();
+	LEGEND_COLOR_ORDER.forEach((c, i) => {
+		rank.set(c, i);
+	});
+	let next = LEGEND_COLOR_ORDER.length;
+	for (const e of legend) {
+		if (!rank.has(e.color)) rank.set(e.color, next++);
+	}
+	return legend
+		.map((e, i) => ({ e, i }))
+		.sort((a, b) => {
+			const byColor = (rank.get(a.e.color) ?? 0) - (rank.get(b.e.color) ?? 0);
+			return byColor !== 0 ? byColor : a.i - b.i;
+		})
+		.map(({ e }) => e);
+}
+
 /** Holiday → always red; else a configured colour; else the next cycle colour. */
 function resolveCalendarColor(
 	name: string,
@@ -358,9 +392,11 @@ function buildCalendarPayloadFetcher() {
 				}
 			}
 
-			const legend: CalendarLegendEntry[] = active
-				.filter((g) => g.name)
-				.map((g) => ({ name: g.name, color: g.color }));
+			const legend: CalendarLegendEntry[] = groupLegendByColor(
+				active
+					.filter((g) => g.name)
+					.map((g) => ({ name: g.name, color: g.color })),
+			);
 
 			return {
 				events: out,
