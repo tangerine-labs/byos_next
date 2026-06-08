@@ -57,11 +57,34 @@ test.describe("google-calendar recipe (fixture data)", () => {
 
 		// Pokémon GO Fest 2026 (Fri–Sun) is drawn as a single block spanning its
 		// day columns, not repeated once per day.
-		const block = page.locator('[style*="grid-column"]');
+		const block = page
+			.locator('[style*="grid-column"]')
+			.filter({ hasText: "Pokémon GO Fest 2026" });
 		await expect(block).toHaveCount(1);
-		await expect(block).toContainText("Pokémon GO Fest 2026");
 		// Friday is column 5 (Mon-first), Fri→Sun covers 3 columns.
 		await expect(block).toHaveAttribute("style", /grid-column:\s*5 \/ span 3/);
+	});
+
+	test("non-overlapping multi-day events share one band row", async ({
+		page,
+	}) => {
+		await page.goto(PREVIEW_URL);
+
+		// Malta-tur (Mon–Tue) and Konference (Wed–Thu) don't overlap, so they pack
+		// onto the same row (same Y) rather than stacking under each other.
+		const malta = page.getByText("Malta-tur");
+		const konference = page.getByText("Konference");
+		await expect(malta).toBeVisible();
+		await expect(konference).toBeVisible();
+
+		const a = await malta.boundingBox();
+		const b = await konference.boundingBox();
+		if (!a || !b) throw new Error("span blocks were not laid out");
+
+		// Same vertical position (allowing sub-pixel rounding)…
+		expect(Math.abs(a.y - b.y)).toBeLessThanOrEqual(1);
+		// …and side by side (Konference is to the right of Malta-tur).
+		expect(b.x).toBeGreaterThan(a.x);
 	});
 
 	test("a combined event shows both calendars' colours (striped)", async ({

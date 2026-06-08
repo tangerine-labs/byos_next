@@ -201,7 +201,7 @@ export default function GoogleCalendar({
 
 	// A multi-day event drawn as one block spanning its day columns. Edges that
 	// run off the visible week are flattened (no rounded corner + a chevron).
-	const renderSpanBlock = (span: SpanEvent, row: number) => {
+	const renderSpanBlock = (span: SpanEvent) => {
 		const base = span.colors[0] ?? display6.black;
 		const background =
 			span.colors.length >= 2
@@ -211,11 +211,11 @@ export default function GoogleCalendar({
 		const r = px(6);
 		return (
 			<div
-				key={`span-${row}-${span.title}`}
+				key={`span-${span.row}-${span.startIndex}-${span.title}`}
 				className="flex items-center"
 				style={{
 					gridColumn: `${span.startIndex + 1} / span ${span.span}`,
-					gridRow: row + 1,
+					gridRow: span.row + 1,
 					background,
 					color: fg,
 					paddingLeft: px(8),
@@ -509,7 +509,7 @@ export default function GoogleCalendar({
 										rowGap: px(3),
 									}}
 								>
-									{spanningEvents.map((s, i) => renderSpanBlock(s, i))}
+									{spanningEvents.map((s) => renderSpanBlock(s))}
 								</div>
 							)}
 							<div

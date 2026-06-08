@@ -26,6 +26,7 @@ export type FixtureCalendar = {
 
 // Monday-relative day offsets, for readability.
 const MON = 0;
+const TUE = 1;
 const WED = 2;
 const THU = 3;
 const FRI = 4;
@@ -88,7 +89,11 @@ export function googleCalendarFixture(weekStartISO: string): FixtureCalendar[] {
 		timed(weekStart, MON, 6, 30, 60, "Training", "fx-training-mon"),
 		timed(weekStart, WED, 6, 30, 60, "Training", "fx-training-wed"),
 		timed(weekStart, FRI, 6, 30, 60, "Training", "fx-training-fri"),
-		// Friday–Sunday inclusive → end.date is the following Monday (exclusive).
+		// Two multi-day events that don't overlap (Mon–Tue, then Wed–Thu) so they
+		// pack onto the same band row; Pokémon GO Fest (Fri–Sun) fills the rest of
+		// the row. end.date is exclusive (the day after the last covered day).
+		allDay(weekStart, MON, TUE + 1, "Malta-tur", "fx-malta"),
+		allDay(weekStart, WED, THU + 1, "Konference", "fx-konference"),
 		allDay(weekStart, FRI, SUN + 1, "Pokémon GO Fest 2026", "fx-pogo-fest"),
 		timed(weekStart, WED, 18, 0, 90, "Scouts", "fx-scouts-bjorn"),
 	];

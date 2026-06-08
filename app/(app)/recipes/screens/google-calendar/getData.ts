@@ -201,6 +201,8 @@ export type SpanEvent = {
 	startIndex: number;
 	/** Number of day columns the block covers in this week (1–7). */
 	span: number;
+	/** Band row (0-based). Non-overlapping spans share a row to save vertical space. */
+	row: number;
 	/** The event began before this week (flatten the left edge). */
 	continuesBefore: boolean;
 	/** The event continues after this week (flatten the right edge). */
@@ -666,6 +668,7 @@ export default async function getData(
 			colors: ev.colors.slice(0, 2),
 			startIndex: daysBetween(weekStart, clipStart),
 			span: daysBetween(clipStart, clipEndExcl),
+			row: 0,
 			continuesBefore: Temporal.PlainDate.compare(evStart, weekStart) < 0,
 			continuesAfter: Temporal.PlainDate.compare(evEndExcl, weekEndExcl) > 0,
 		});
@@ -673,6 +676,20 @@ export default async function getData(
 	const spanningEvents = [...spanAccum.values()].sort(
 		(a, b) => a.startIndex - b.startIndex || b.span - a.span,
 	);
+
+	// Pack spans into rows: reuse the first row whose last block ends at or
+	// before this block's start, so non-overlapping events share a Y position
+	// instead of stacking. `laneEnds[r]` is the exclusive end column of row r.
+	const laneEnds: number[] = [];
+	for (const ev of spanningEvents) {
+		let row = laneEnds.findIndex((end) => end <= ev.startIndex);
+		if (row === -1) {
+			row = laneEnds.length;
+			laneEnds.push(0);
+		}
+		ev.row = row;
+		laneEnds[row] = ev.startIndex + ev.span;
+	}
 
 	// Group the remaining (single-day all-day + timed) events onto week days.
 	// Multi-day events live in the spanning band, not the per-day columns.
