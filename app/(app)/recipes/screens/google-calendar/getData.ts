@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import {
+	type GoogleEvent,
 	getValidAccessToken,
 	isCalendarConnected,
 	isGoogleOAuthConfigured,
@@ -11,6 +12,7 @@ import {
 	getHolidayDates,
 	type HolidayCountry,
 } from "../color-calendar/holidays";
+import { googleCalendarFixture } from "./fixtures";
 import { accentForIndex, display6 } from "./tokens";
 
 // Mark dynamic so the renderer always re-evaluates "now" (caching of the actual
@@ -21,8 +23,8 @@ const TZ = "Europe/Copenhagen";
 const LOCALE = "da-DK";
 
 // Calendars whose name matches this are always drawn red (and skip the colour
-// cycle), e.g. "Holidays in Denmark", "Helgdagar i Sverige".
-const HOLIDAY_CALENDAR_RE = /holidays|helgdag/i;
+// cycle), e.g. "Holidays in Denmark", "Danske helligdage", "Svenska helgdagar".
+const HOLIDAY_CALENDAR_RE = /holidays|helgdag|helligdag/i;
 
 const NAMED_COLORS: Record<string, string> = {
 	black: display6.black,
@@ -298,6 +300,96 @@ function expandAllDay(
 	return out;
 }
 
+/** One calendar's raw events plus the flags assembly needs (pre-colour). */
+export type CalendarGroup = {
+	events: GoogleEvent[];
+	name: string;
+	isVacation: boolean;
+};
+
+/**
+ * Pure assembly of per-calendar Google events into the render payload: assigns
+ * accent colours, normalizes/expands events, collects vacation dates, and builds
+ * the colour-grouped legend. Shared by the live fetch and the test fixture so
+ * both paths run identical logic; importable directly for unit tests.
+ */
+export function assembleCalendarPayload(
+	groups: CalendarGroup[],
+	args: {
+		calendarColorsJson: string;
+		rangeStartStr: string;
+		rangeEndExclStr: string;
+	},
+): CalendarPayload {
+	const rangeStart = Temporal.PlainDate.from(args.rangeStartStr);
+	const rangeEndExcl = Temporal.PlainDate.from(args.rangeEndExclStr);
+
+	// Only calendars with events get an accent. Holiday calendars are always
+	// red; JSON-configured calendars get their colour; neither consumes a cycle
+	// slot. The rest cycle (black → blue → yellow → green).
+	const colorRules = parseCalendarColors(args.calendarColorsJson);
+	let cycleIdx = 0;
+	const active = groups
+		.filter((g) => g.events.length > 0)
+		.map((g) => ({
+			...g,
+			color: resolveCalendarColor(g.name, colorRules, () =>
+				accentForIndex(cycleIdx++),
+			),
+		}));
+
+	const out: NormalizedEvent[] = [];
+	const vacationDates = new Set<string>();
+
+	for (const group of active) {
+		for (const ev of group.events) {
+			const title = ev.summary?.trim() || "(uden titel)";
+			if (ev.start.date) {
+				// All-day event.
+				const dates = expandAllDay(
+					ev.start.date,
+					ev.end.date ?? ev.start.date,
+					rangeStart,
+					rangeEndExcl,
+				);
+				for (const dateStr of dates) {
+					if (group.isVacation) vacationDates.add(dateStr);
+					out.push({
+						dateStr,
+						title,
+						allDay: true,
+						startLabel: "",
+						startEpoch: 0,
+						colors: [group.color],
+					});
+				}
+			} else if (ev.start.dateTime) {
+				// Timed event.
+				const inst = Temporal.Instant.from(ev.start.dateTime);
+				const zdt = inst.toZonedDateTimeISO(TZ);
+				out.push({
+					dateStr: zdt.toPlainDate().toString(),
+					title,
+					allDay: false,
+					startLabel: timeLabel(zdt),
+					startEpoch: inst.epochMilliseconds,
+					colors: [group.color],
+				});
+			}
+		}
+	}
+
+	const legend: CalendarLegendEntry[] = groupLegendByColor(
+		active.filter((g) => g.name).map((g) => ({ name: g.name, color: g.color })),
+	);
+
+	return {
+		events: out,
+		vacationDates: [...vacationDates],
+		calendars: legend,
+	};
+}
+
 function buildCalendarPayloadFetcher() {
 	return unstable_cache(
 		async (args: {
@@ -315,12 +407,10 @@ function buildCalendarPayloadFetcher() {
 				throw new Error("No Google access token");
 			}
 
-			const rangeStart = Temporal.PlainDate.from(args.rangeStartStr);
-			const rangeEndExcl = Temporal.PlainDate.from(args.rangeEndExclStr);
 			const vacationMatch = args.vacationCalendar.trim().toLowerCase();
 
 			const calendars = await listCalendars(accessToken);
-			const perCalendar = await Promise.all(
+			const perCalendar: CalendarGroup[] = await Promise.all(
 				calendars.map((cal) =>
 					listEvents(
 						accessToken,
@@ -337,72 +427,11 @@ function buildCalendarPayloadFetcher() {
 				),
 			);
 
-			// Only calendars with events get an accent. Holiday calendars are
-			// always red; JSON-configured calendars get their colour; neither
-			// consumes a cycle slot. The rest cycle (black → blue → yellow → green).
-			const colorRules = parseCalendarColors(args.calendarColorsJson);
-			let cycleIdx = 0;
-			const active = perCalendar
-				.filter((g) => g.events.length > 0)
-				.map((g) => ({
-					...g,
-					color: resolveCalendarColor(g.name, colorRules, () =>
-						accentForIndex(cycleIdx++),
-					),
-				}));
-
-			const out: NormalizedEvent[] = [];
-			const vacationDates = new Set<string>();
-
-			for (const group of active) {
-				for (const ev of group.events) {
-					const title = ev.summary?.trim() || "(uden titel)";
-					if (ev.start.date) {
-						// All-day event.
-						const dates = expandAllDay(
-							ev.start.date,
-							ev.end.date ?? ev.start.date,
-							rangeStart,
-							rangeEndExcl,
-						);
-						for (const dateStr of dates) {
-							if (group.isVacation) vacationDates.add(dateStr);
-							out.push({
-								dateStr,
-								title,
-								allDay: true,
-								startLabel: "",
-								startEpoch: 0,
-								colors: [group.color],
-							});
-						}
-					} else if (ev.start.dateTime) {
-						// Timed event.
-						const inst = Temporal.Instant.from(ev.start.dateTime);
-						const zdt = inst.toZonedDateTimeISO(TZ);
-						out.push({
-							dateStr: zdt.toPlainDate().toString(),
-							title,
-							allDay: false,
-							startLabel: timeLabel(zdt),
-							startEpoch: inst.epochMilliseconds,
-							colors: [group.color],
-						});
-					}
-				}
-			}
-
-			const legend: CalendarLegendEntry[] = groupLegendByColor(
-				active
-					.filter((g) => g.name)
-					.map((g) => ({ name: g.name, color: g.color })),
-			);
-
-			return {
-				events: out,
-				vacationDates: [...vacationDates],
-				calendars: legend,
-			};
+			return assembleCalendarPayload(perCalendar, {
+				calendarColorsJson: args.calendarColorsJson,
+				rangeStartStr: args.rangeStartStr,
+				rangeEndExclStr: args.rangeEndExclStr,
+			});
 		},
 		["google-calendar-payload"],
 		{ revalidate: 300, tags: ["google-calendar"] },
@@ -467,25 +496,39 @@ export default async function getData(
 	const monthTitle = monthYearFormat.format(labelDate(firstOfMonth));
 	const configured = isGoogleOAuthConfigured();
 
+	// Test/preview mode: render deterministic fixture data with no Google account.
+	// Used by unit tests, Playwright e2e, and local preview.
+	const useFixture = process.env.GOOGLE_CALENDAR_FIXTURE === "true";
+
+	const calendarColorsJson =
+		typeof params?.calendarColors === "string" ? params.calendarColors : "{}";
+
 	// Fresh connection check (never cached) so the screen flips to "connected"
 	// immediately after the OAuth handshake.
 	const connected =
-		configured && userId ? await isCalendarConnected(userId) : false;
+		useFixture ||
+		(configured && userId ? await isCalendarConnected(userId) : false);
 
 	let payload: CalendarPayload = {
 		events: [],
 		vacationDates: [],
 		calendars: [],
 	};
-	if (connected && userId) {
+	if (useFixture) {
+		payload = assembleCalendarPayload(
+			googleCalendarFixture(weekStart.toString()),
+			{
+				calendarColorsJson,
+				rangeStartStr: rangeStart.toString(),
+				rangeEndExclStr: rangeEndExcl.toString(),
+			},
+		);
+	} else if (connected && userId) {
 		try {
 			payload = await getCachedCalendarPayload({
 				userId,
 				vacationCalendar,
-				calendarColorsJson:
-					typeof params?.calendarColors === "string"
-						? params.calendarColors
-						: "{}",
+				calendarColorsJson,
 				timeMinISO: dayStartInstantISO(rangeStart),
 				timeMaxISO: dayStartInstantISO(rangeEndExcl),
 				rangeStartStr: rangeStart.toString(),
